@@ -31,6 +31,8 @@ Release SHA-256: `80CF66D25E5244A455576B478DB1BD3F88E5E8B8FEB653D2677C9D938BC87B
 
 Скриншоты просмотрены: [light](screenshots/shell-light.png), [dark](screenshots/shell-dark.png), [compact](screenshots/shell-compact.png), [release WebView2](screenshots/shell-webview2.png), [dev WebView2](screenshots/shell-dev-webview2.png). При минимальной высоте есть вертикальная прокрутка, горизонтального переполнения нет.
 
+Дополнительно: свежий локальный Git clone → install --frozen-lockfile → check → build:web — passed на том же Windows 11 хосте с уже установленными инструментами.
+
 ## Права и ограничения
 
 Пользовательские/системные файлы не сканировались и не удалялись, реестр/автозагрузка не менялись. Тесты создают собственные profiles/artifacts; CDP включается только для дочернего процесса на loopback, тест закрывает только своё дерево процессов.
