@@ -34,7 +34,7 @@ cargo --version
 
 ## Установка зависимостей и запуск
 
-Склонируйте согласованный GitHub-репозиторий и перейдите в его корень. До публикации используйте текущую локальную папку проекта. URL ещё не утверждён.
+Склонируйте [GitHub-репозиторий](https://github.com/SpellbourneDZ/pc-care) и перейдите в его корень. До слияния SPE-55 код находится в ветке codex/spe-55-monorepo.
 
 ```powershell
 pnpm install --frozen-lockfile
@@ -79,7 +79,7 @@ pnpm test:native
 
 Нет пользовательских IPC-команд и системных plugins; у окна пустой список permissions. Production CSP разрешает только локальные ресурсы; dev CSP отдельно допускает локальный HMR. Предварительный app identifier `local.pccare.desktop` не является утверждённым публичным именем.
 
-NSIS current-user намечен конфигурацией, bundling выключен. Установщик, подпись, clean Windows 10/11 VM и merge protection относятся к последующим задачам/настройке GitHub. Файл CI подготовлен, но удалённый запуск и branch protection нельзя подтвердить без remote.
+NSIS current-user намечен конфигурацией, bundling выключен. Установщик, подпись, clean Windows 10/11 VM и merge protection относятся к последующим задачам/настройке GitHub. Проверки CI видны в PR; branch protection будет настроен в SPE-60.
 
 ## Неполадки
 
@@ -89,4 +89,4 @@ NSIS current-user намечен конфигурацией, bundling выклю
 - Registry timeout при shadcn: CLI использует HTTPS_PROXY/HTTP_PROXY, а не автоматически прокси Windows. При наличии системного прокси передайте его в окружении процесса. Не сохраняйте адреса/учётные данные прокси в Git.
 - Ошибка запуска WebView2: проверьте Evergreen Runtime; UI тест нельзя считать пройденным только по успешной компиляции.
 
-Лицензия ожидает выбора владельца. MIT пока только предложение; installer/release не публикуется.
+Лицензия MIT находится в корне репозитория; installer/release не публикуется на этапе foundation.

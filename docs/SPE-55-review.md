@@ -7,9 +7,10 @@ Linear: https://linear.app/splbrn/issue/SPE-55/sozdat-github-repozitorij-i-bazov
 - pnpm/Cargo workspace, Tauri 2/Rust + React/TS strict/Vite, Tailwind и официальный shadcn/Radix Button.
 - apps/desktop/src/ui, src-tauri/domain и src-tauri/win/adapters; пока без системных операций, IPC-команд и FS/shell/registry plugins. Capabilities пустые, production CSP локальный, dev HMR разрешён отдельно.
 - RU default, semantic tokens, Segoe UI, системные light/dark themes, keyboard disclosure, reduced motion. Полная дизайн-система — SPE-56.
+- По решению владельца палитра монохромная: белый/чёрный/нейтральный серый, включая фокус, selection, destructive token и app icon. Скриншоты и native EXE обновлены и повторно проверены.
 - Зафиксированы Node 24.22.1, pnpm 10.34.8, Rust stable release 1.99.1, Tauri 2.12.5 / CLI 2.12.4 и lockfiles.
 - AGENTS.md, README и Windows setup, базовый Windows CI и PR template. Нет фиктивных packages и сетевого backend.
-- Локальная main содержит bootstrap commit для будущего PR; реализация в codex/spe-55-monorepo. Remote отсутствует, GitHub/PR не созданы.
+- main содержит bootstrap commit для первого PR; реализация в codex/spe-55-monorepo. GitHub: https://github.com/SpellbourneDZ/pc-care. Лицензия MIT, upstream notice shadcn сохранён отдельно.
 
 ## Проверка — 24.10.2026, Asia/Novosibirsk
 
@@ -27,7 +28,7 @@ Windows 11 Pro build 26200 x64, WebView2 155.0.4283.62. Приложение п�
 | pnpm test:native                        | 1 passed: release WebView2, offline reload, CSS, keyboard                         |
 | pnpm dev --no-watch                     | passed: Vite + debug EXE + WebView2, работающая кнопка, без JS/CSP console errors |
 
-Release SHA-256: `80CF66D25E5244A455576B478DB1BD3F88E5E8B8FEB653D2677C9D938BC87B24`. Authenticode: NotSigned. Installer не собирался; NSIS current-user намечен в конфигурации, bundling выключен.
+Release SHA-256 монохромной версии: `EA6EAC5A11E9E28A7E0A5FC33E1DED96CA5693132CC630C23A689C7F5D7D5566`. Authenticode: NotSigned. Installer не собирался; NSIS current-user намечен в конфигурации, bundling выключен.
 
 Скриншоты просмотрены: [light](screenshots/shell-light.png), [dark](screenshots/shell-dark.png), [compact](screenshots/shell-compact.png), [release WebView2](screenshots/shell-webview2.png), [dev WebView2](screenshots/shell-dev-webview2.png). При минимальной высоте есть вертикальная прокрутка, горизонтального переполнения нет.
 
@@ -37,7 +38,7 @@ Release SHA-256: `80CF66D25E5244A455576B478DB1BD3F88E5E8B8FEB653D2677C9D938BC87B
 
 Пользовательские/системные файлы не сканировались и не удалялись, реестр/автозагрузка не менялись. Тесты создают собственные profiles/artifacts; CDP включается только для дочернего процесса на loopback, тест закрывает только своё дерево процессов.
 
-Не выполнены: GitHub publication/PR/remote CI/branch protection (нужно подтверждение owner/name/settings); LICENSE (MIT только предложение); чистые Windows 10/11 VM clone→install→dev→build. Текущий ПК не заменяет обе VM. Installer/signing, DPI и screen reader также не подтверждены.
+Не выполнены: branch protection (SPE-60), чистые Windows 10/11 VM clone→install→dev→build. Текущий ПК не заменяет обе VM. Installer/signing, DPI и screen reader также не подтверждены. Результаты удалённого CI проверять в PR по текущему commit.
 
 Linear get_agent_context/record_agent_learning возвращают Tool not found; проект, все 30 issues/зависимости и три документа доступны и прочитаны через MCP. Особенность Windows proxy для shadcn описана в setup docs без адресов/секретов.
 
