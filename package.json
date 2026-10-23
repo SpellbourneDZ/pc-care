@@ -1,0 +1,27 @@
+{
+  "name": "pc-care",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.34.8",
+  "engines": {
+    "node": ">=24.0.0 <25",
+    "pnpm": "10.34.8"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @pc-care/desktop dev",
+    "dev:web": "pnpm --filter @pc-care/desktop dev:web",
+    "build": "pnpm --filter @pc-care/desktop build",
+    "build:web": "pnpm --filter @pc-care/desktop build:web",
+    "check": "pnpm --filter @pc-care/desktop check",
+    "lint": "pnpm --filter @pc-care/desktop lint",
+    "test": "pnpm --filter @pc-care/desktop test",
+    "test:smoke": "pnpm --filter @pc-care/desktop test:smoke",
+    "test:native": "pnpm --filter @pc-care/desktop test:native",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "rust:check": "cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo test --workspace --locked"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
+  }
+}

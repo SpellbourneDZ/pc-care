@@ -1,0 +1,8 @@
+node_modules
+dist
+target
+gen
+.tools
+pnpm-lock.yaml
+test-results
+playwright-report

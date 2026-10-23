@@ -1,0 +1,75 @@
+@import 'tailwindcss';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+@theme inline {
+  --font-sans: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--muted);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--muted);
+  --color-accent-foreground: var(--foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--ring);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+}
+
+:root {
+  color-scheme: light dark;
+  --background: #f5f7f6;
+  --foreground: #1d2a28;
+  --card: #ffffff;
+  --primary: #12625a;
+  --primary-foreground: #ffffff;
+  --muted: #eaf0ee;
+  --muted-foreground: #52645f;
+  --destructive: #b52f32;
+  --border: #d5dfdb;
+  --ring: #12625a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #141b19;
+    --foreground: #e6eeeb;
+    --card: #1a2421;
+    --primary: #80d4be;
+    --primary-foreground: #102a22;
+    --muted: #25342e;
+    --muted-foreground: #a4b9b0;
+    --destructive: #ff9b9e;
+    --border: #374b43;
+    --ring: #80d4be;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply m-0 bg-background font-sans text-foreground antialiased;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

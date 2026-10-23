@@ -1,0 +1,6 @@
+packages:
+  - apps/*
+saveExact: true
+onlyBuiltDependencies:
+  - '@tailwindcss/oxide'
+  - esbuild

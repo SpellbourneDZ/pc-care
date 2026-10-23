@@ -1,0 +1,16 @@
+[package]
+name = "pc-care"
+version = "0.1.0"
+description = "Local Windows maintenance utility"
+publish = false
+edition = "2024"
+rust-version = "1.99"
+
+[lib]
+name = "pc_care"
+
+[build-dependencies]
+tauri-build = { version = "=2.7.4", features = [] }
+
+[dependencies]
+tauri = { version = "=2.12.5", features = [] }
