@@ -93,6 +93,48 @@ impl Fixture {
 }
 
 #[test]
+fn candidate_publication_holds_reservation_and_releases_it_on_sink_error() {
+    for reject in [false, true] {
+        let f = Fixture::new();
+        let path = f.file(RuleId::UserTemp, "reserved/data.tmp", true);
+        let mut published = 0;
+        let result = f.scanner.scan(&mut |event| {
+            if let ScanEvent::Candidate(_) = event {
+                published += 1;
+                let error = fs::OpenOptions::new()
+                    .access_mode(FILE_WRITE_DATA)
+                    .open(&path)
+                    .unwrap_err();
+                assert_eq!(
+                    error.raw_os_error(),
+                    Some(windows_sys::Win32::Foundation::ERROR_SHARING_VIOLATION as i32)
+                );
+                if reject {
+                    return Err(ApiError::Disconnected);
+                }
+            }
+            Ok(())
+        });
+        assert_eq!(published, 1);
+        assert_eq!(
+            result,
+            if reject {
+                Err(ApiError::Disconnected)
+            } else {
+                Ok(())
+            }
+        );
+        drop(
+            fs::OpenOptions::new()
+                .access_mode(FILE_WRITE_DATA)
+                .open(&path)
+                .unwrap(),
+        );
+        assert_eq!(fs::read(path).unwrap(), vec![42; 65_536]);
+    }
+}
+
+#[test]
 fn three_allowlisted_sources_report_allocation_and_leave_bytes_unchanged() {
     let f = Fixture::new();
     let paths: Vec<_> = RuleId::ALL

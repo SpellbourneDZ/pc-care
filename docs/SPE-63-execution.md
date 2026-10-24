@@ -9,8 +9,17 @@
 - `win/adapters/execution.rs`: один фоновый batch, эксклюзивная файловая lease между экземплярами, получение результата и запрос отмены. Терминальный результат публикуется после освобождения lease.
 - При восстановлении `Started` становится `Unknown`, оставшиеся `Pending` — `Skipped/Interrupted`. Повторный запрос с прежним plan ID возвращает сохранённый результат и не повторяет эффект. Автоматического resume/retry нет.
 - Recycle не считается освобождением места: даже подтверждённый перенос в корзину оставляет `actual_reclaimed_bytes` неизвестным. В dry-run эффекты не вызываются, reclaimed bytes равны нулю.
+- `FilePolicy::reserve` повторяет проверки snapshot и возвращает RAII-объект с дескрипторами файла и всех каталогов пути. Анализатор удерживает его до окончания публикации кандидата; обычный `revalidate` освобождает сразу после проверки. Это не разрешение на перенос или удаление.
 
 Журнал ограничен 64 записями по 256 КиБ и 500 элементами в плане. Очистка журнала и пользовательская история пока не реализованы; при исчерпании лимита возвращается `Capacity`. Неизвестная версия, некорректные данные, redirect/hardlink или lock приводят к отказу, а не сбросу файла. Это журнал приложения, не защита от другого процесса с полным доступом того же пользователя.
+
+## Удержание проверенного пути
+
+Regression test выявил, что открытие каталога только с `FILE_READ_ATTRIBUTES` не блокировало новый дескриптор с правом `DELETE`, несмотря на отсутствие `FILE_SHARE_DELETE`. Теперь все каталоги пути открываются также с `FILE_LIST_DIRECTORY`. Исправлен и общий `directory_guard`, который используют настройки и журнал исполнения. При отсутствии права чтения каталога операция завершается отказом; повышения прав нет.
+
+Тесты проверяют sharing violation для файла и каждого каталога внутри fixture, запрет открытия файла для записи данных и освобождение дескрипторов после ошибки или `drop`. Интеграционный тест проверяет удержание файла во время публикации кандидата и освобождение при отключении получателя. Содержимое fixtures сохраняется; новые тесты не вызывают rename/delete.
+
+Удержание дескрипторов не замораживает каталог: создание дочерних файлов, изменения атрибутов и другие действия через допустимые Windows-права требуют отдельных проверок. Документация [CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew) отдельно оговаривает, что share mode не распространяется на запросы доступа к атрибутам. Поэтому этот шаг не закрывает всю гонку исполнения. До эффекта по-прежнему нужны актуальные settings/process/policy, защищённое staging-пространство и durable mapping; закрыть дескриптор и удалить исходный путь через COM недостаточно.
 
 ## Изолированный эксперимент
 
@@ -26,7 +35,7 @@
 
 ## Проверки и оставшаяся работа
 
-- На хосте: 60 Rust tests, включая межпроцессную lease и выход без destructors после durable intent, отдельный regression test повторной подготовки read-only bindings; clippy всех targets/features, TypeScript, ESLint, 26 frontend tests, web build, 30 browser smoke tests, production build и Windows WebView2/native smoke прошли. Проверки компиляции всех features и bindings helper добавлены в CI; hosted CI текущей ветки ещё не запускался.
+- На хосте после добавления reservation: 64 Rust tests, включая 4 новых regression tests, межпроцессную lease и выход без destructors после durable intent; clippy всех targets/features, TypeScript, ESLint, 26 frontend tests, web build, 30 browser smoke tests, production build и Windows WebView2/native smoke прошли. Также прошли QA build и 2 native IPC tests настроек/анализа на искусственном профиле. [Результат проверок](evidence/spe-63/windows-host-reservation.md). Hosted CI исходного head `b48f315` прошёл; новые изменения требуют отдельного CI run.
 - Первый запуск внутри Windows VM: 57 Rust tests, 0 failed/ignored. Это версия до добавления теста противоречивых результатов; её отчёт не заменяет проверку последней сборки.
 - Первый COM-эксперимент в VM: удерживаемый handle → `COPYENGINE_E_SHARING_VIOLATION_SRC` (`0x80270027`), файл остался на месте; закрытый handle → положительный HRESULT `0x00270008`, callback с recycle item, исходного файла нет. [Отчёт](evidence/spe-63/windows10-recycle-probe.json) и [manifest EXE](evidence/spe-63/payload-safety-v2.manifest.json). Это подтверждает базовый recycle на fixtures, но не закрывает гонку для executor.
 - Третий COM-случай на отдельном overlay от дискового checkpoint: `SetFileInformationByHandle(FileRenameInfo)` сохранил file ID, отказал при существующем назначении, не затронул replacement по прежнему пути; staged fixture успешно recycled. [Отчёт](evidence/spe-63/windows10-staged-recycle-probe.json) и [manifest EXE/исходников](evidence/spe-63/payload-safety-v4.manifest.json). Это проверка механизма на fixtures, не доказательство безопасности ещё не собранной полной цепочки.

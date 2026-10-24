@@ -26,6 +26,35 @@ impl Fixture {
 }
 
 #[test]
+fn storage_guard_blocks_directory_replacement_until_drop() {
+    let f = Fixture::new();
+    let guard = directory_guard(&f.config, true).unwrap().unwrap();
+    let open_for_delete = |path: &std::path::Path| {
+        OpenOptions::new()
+            .access_mode(DELETE)
+            .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+            .open(path)
+    };
+    let ancestors: Vec<_> = f
+        .config
+        .ancestors()
+        .take_while(|p| p.starts_with(&f.root))
+        .collect();
+    for ancestor in &ancestors {
+        let error = open_for_delete(ancestor).unwrap_err();
+        assert_eq!(
+            error.raw_os_error(),
+            Some(windows_sys::Win32::Foundation::ERROR_SHARING_VIOLATION as i32)
+        );
+    }
+    drop(guard);
+    for ancestor in ancestors {
+        drop(open_for_delete(ancestor).unwrap());
+    }
+}
+
+#[test]
 fn defaults_read_without_creating_config_and_preferences_survive_restart() {
     let f = Fixture::new();
     assert_eq!(f.store.load().unwrap(), defaults());

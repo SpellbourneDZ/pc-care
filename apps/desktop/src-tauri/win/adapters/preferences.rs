@@ -151,7 +151,7 @@ pub(super) fn directory_guard(
         }
         let file = OpenOptions::new()
             .read(true)
-            .access_mode(FILE_READ_ATTRIBUTES)
+            .access_mode(FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY)
             .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
             .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS)
             .open(&target)
