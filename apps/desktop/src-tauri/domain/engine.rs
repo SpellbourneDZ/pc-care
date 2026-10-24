@@ -19,6 +19,7 @@ const MAX_ISSUES: usize = 128;
 const MAX_VISITED: u32 = 100_000;
 const MAX_TASKS: usize = 32;
 const MAX_PLANS: usize = 32;
+pub const MAX_PLAN_ITEMS: usize = 500;
 const PLAN_TTL: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
@@ -373,7 +374,7 @@ impl Engine {
         ids: Vec<CandidateId>,
     ) -> Result<OperationPlan, ApiError> {
         if ids.is_empty()
-            || ids.len() > 500
+            || ids.len() > MAX_PLAN_ITEMS
             || ids.iter().collect::<HashSet<_>>().len() != ids.len()
         {
             return Err(ApiError::InvalidRequest);

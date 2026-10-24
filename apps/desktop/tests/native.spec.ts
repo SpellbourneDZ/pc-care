@@ -22,7 +22,7 @@ test('release executable renders offline in Windows WebView2', async ({
     await context.setOffline(true)
     await page.reload()
     await expect(
-      page.getByRole('heading', { name: ru.moduleNotReady }),
+      page.getByRole('heading', { name: ru.cleanupUx.overviewTitle }),
     ).toBeVisible()
     await expect(page.getByText(ru.exampleData)).not.toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('overview.png') })

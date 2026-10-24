@@ -3,12 +3,16 @@ import { ru } from '@/i18n/ru'
 import type { PageId } from '@/preview/data'
 import { Button } from '@/ui/button'
 import { Card, CardContent, CardHeader } from '@/ui/card'
+import type { CleanupController } from '@/hooks/use-cleanup'
+import { CleanupScreen } from './cleanup-screen'
 export function LiveWorkspace({
   page,
   onNavigate,
+  cleanup,
 }: {
   page: PageId
   onNavigate: (page: PageId) => void
+  cleanup: CleanupController
 }) {
   return (
     <div className="workspace">
@@ -23,10 +27,18 @@ export function LiveWorkspace({
           <Card className="overview-start">
             <CardContent>
               <ShieldCheck className="mb-5 size-8" aria-hidden="true" />
-              <h2>{ru.moduleNotReady}</h2>
-              <p>{ru.moduleNotReadyDescription}</p>
+              <h2>{ru.cleanupUx.overviewTitle}</h2>
+              <p>{ru.cleanupUx.overviewDescription}</p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Button disabled>{ru.findJunk}</Button>
+                <Button
+                  disabled={!cleanup.canStart}
+                  onClick={() => {
+                    onNavigate('cleanup')
+                    cleanup.start()
+                  }}
+                >
+                  {ru.findJunk}
+                </Button>
                 <Button variant="outline" onClick={() => onNavigate('cleanup')}>
                   {ru.openCleanup}
                 </Button>
@@ -55,6 +67,8 @@ export function LiveWorkspace({
             </CardContent>
           </Card>
         </>
+      ) : page === 'cleanup' ? (
+        <CleanupScreen controller={cleanup} />
       ) : page === 'history' ? (
         <section className="empty-state">
           <History aria-hidden="true" />

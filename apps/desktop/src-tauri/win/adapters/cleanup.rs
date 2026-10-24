@@ -50,6 +50,13 @@ impl CleanupScanner {
             / 100
             + 116_444_736_000_000_000;
         let now = i64::try_from(ticks).map_err(|_| ApiError::Internal)?;
+        #[cfg(feature = "qa-fixtures")]
+        let now = if std::env::var_os("PC_CARE_FIXTURE_AGED").is_some_and(|value| value == "1") {
+            now.checked_add(30 * 24 * 3600 * 10_000_000)
+                .ok_or(ApiError::Internal)?
+        } else {
+            now
+        };
         Ok(Self {
             policy,
             #[cfg(any(test, feature = "qa-fixtures"))]

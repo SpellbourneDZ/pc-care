@@ -198,6 +198,14 @@ pub struct CleanupRule {
     pub min_age_hours: u32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct CleanupCatalog {
+    pub rules: Vec<CleanupRule>,
+    pub fixture_mode: bool,
+    pub max_plan_items: u32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanWarning {
@@ -294,7 +302,7 @@ pub enum ApiRequest {
     deny_unknown_fields
 )]
 pub enum ApiResponse {
-    CleanupRules(Vec<CleanupRule>),
+    CleanupRules(CleanupCatalog),
     Preferences(SettingsSnapshot),
     ScanStarted { task_id: ScanTaskId },
     Task(TaskProgress),

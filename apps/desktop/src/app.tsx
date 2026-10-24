@@ -9,6 +9,7 @@ import { QuickSearch } from '@/components/quick-search'
 import { LiveWorkspace } from '@/components/live-workspace'
 import { PreferencesPanel } from '@/components/preferences-panel'
 import { useTheme, type Theme } from '@/hooks/use-theme'
+import { useCleanup } from '@/hooks/use-cleanup'
 import { routeHash, useRoute } from '@/lib/routes'
 import { usePreferences, preferencesErrorMessage } from '@/lib/preferences'
 import type { PageId } from '@/preview/data'
@@ -22,6 +23,11 @@ function Shell() {
   const snapshot = preferences.query.isError
     ? undefined
     : preferences.query.data
+  const cleanup = useCleanup(
+    !route.preview,
+    snapshot?.revision,
+    preferences.query.error,
+  )
   const theme = route.preview
     ? previewTheme
     : (snapshot?.preferences.theme ?? 'system')
@@ -120,7 +126,11 @@ function Shell() {
               }}
             />
           ) : (
-            <LiveWorkspace page={route.page} onNavigate={navigate} />
+            <LiveWorkspace
+              page={route.page}
+              onNavigate={navigate}
+              cleanup={cleanup}
+            />
           )}
           <footer className="app-status">
             <span>{ru.noChanges}</span>

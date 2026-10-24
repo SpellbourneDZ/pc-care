@@ -89,6 +89,8 @@ function SidebarProvider({
         event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
         (event.metaKey || event.ctrlKey)
       ) {
+        if (document.querySelector('[role="dialog"], [role="alertdialog"]'))
+          return
         event.preventDefault()
         toggleSidebar()
       }
