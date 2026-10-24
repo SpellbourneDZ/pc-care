@@ -10,7 +10,7 @@ PC Care — предварительная версия бесплатного o
 
 - Приложение запускается без администратора. UI имеет только закрытый типизированный `operation_api`; прямого filesystem/registry/shell API нет.
 - Production CSP разрешает локальные ресурсы; runtime backend, аккаунтов и телеметрии нет. Загрузка зависимостей/инструментов во время build требует сети.
-- Реальные scan/cleanup/startup/uninstall пока не подключены. Debug mock scan и frontend prototype явно отделены; execution plan пока только симуляция с нулём освобождённых байтов.
+- Read-only анализ cleanup доступен через typed API с фиксированными roots и policy; рабочий экран подключается в SPE-62. Очистка/startup/uninstall не подключены. Debug mock scan и frontend prototype явно отделены; native cleanup execute возвращает unsupported, mock execution остаётся симуляцией с нулём освобождённых байтов.
 - Единственная реализованная запись приложения — собственные локальные настройки с валидацией, schema/revision, lock и atomic replacement. Содержимое файлов пользователя не пишется в логи.
 - Защитная политика backend default-deny и read-only revalidation не являются разрешением на удаление. Реальные effects потребуют SPE-63 и durable outcome recovery.
 

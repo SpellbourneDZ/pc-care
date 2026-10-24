@@ -4,4 +4,4 @@ import type { CandidateId } from "./CandidateId";
 import type { SafetyClass } from "./SafetyClass";
 import type { ScanKind } from "./ScanKind";
 
-export type Candidate = { id: CandidateId, source: ScanKind, source_key: string, display_path: string, identity: string, rule_id: string, bytes: ByteCount, safety: SafetyClass, };
+export type Candidate = { id: CandidateId, source: ScanKind, source_key: string, display_path: string, identity: string, rule_id: string, bytes: ByteCount, logical_bytes: ByteCount, safety: SafetyClass, };

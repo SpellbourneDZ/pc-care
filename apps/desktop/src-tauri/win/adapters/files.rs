@@ -15,10 +15,7 @@ use windows_sys::{
     core::GUID,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FileSource {
-    UserTemp,
-}
+pub use crate::domain::cleanup::RuleId as FileSource;
 
 pub struct FileSnapshot {
     id: CandidateId,
@@ -62,19 +59,38 @@ impl Exclusions {
 pub struct FilePolicy {
     profile: LocalPath,
     temp: LocalPath,
+    local_app_data: LocalPath,
     protected: Vec<LocalPath>,
     pub exclusions: Exclusions,
 }
 impl FilePolicy {
+    #[cfg(any(test, feature = "qa-fixtures"))]
+    pub(crate) fn for_fixture(profile: &std::path::Path) -> Result<Self, Denial> {
+        let profile = LocalPath::parse(profile.to_str().ok_or(Denial::UnsupportedPath)?)?;
+        let local_app_data = profile.child(r"AppData\Local")?;
+        Ok(Self {
+            temp: local_app_data.child("Temp")?,
+            local_app_data,
+            protected: vec![
+                profile.child("Documents")?,
+                profile.child("Downloads")?,
+                profile.child("Desktop")?,
+            ],
+            profile,
+            exclusions: Exclusions::default(),
+        })
+    }
     pub fn for_current_user() -> Result<Self, Denial> {
         let profile = known_folder(&FOLDERID_Profile)?;
-        let temp = known_folder(&FOLDERID_LocalAppData)?.child("Temp")?;
+        let local_app_data = known_folder(&FOLDERID_LocalAppData)?;
+        let temp = local_app_data.child("Temp")?;
         if !temp.within(&profile) || temp == profile {
             return Err(Denial::OutsideScope);
         }
         Ok(Self {
             profile,
             temp,
+            local_app_data,
             protected: vec![
                 known_folder(&FOLDERID_Windows)?,
                 known_folder(&FOLDERID_ProgramFiles)?,
@@ -88,6 +104,20 @@ impl FilePolicy {
         })
     }
     pub fn check_path(&self, source: FileSource, path: &LocalPath) -> Result<(), Denial> {
+        self.check_scope(source, path, false)
+    }
+    pub fn root(&self, source: FileSource) -> Result<LocalPath, Denial> {
+        match source.cache_relative() {
+            Some(relative) => self.local_app_data.child(relative),
+            None => Ok(self.temp.clone()),
+        }
+    }
+    fn check_scope(
+        &self,
+        source: FileSource,
+        path: &LocalPath,
+        directory: bool,
+    ) -> Result<(), Denial> {
         if path.is_root() || self.protected.iter().any(|p| path.within(p)) {
             return Err(Denial::Protected);
         }
@@ -109,15 +139,35 @@ impl FilePolicy {
         if self.exclusions.contains(path) {
             return Err(Denial::Excluded);
         }
-        // No broad profile/AppData permission: browser state, documents and other users stay denied.
-        match source {
-            FileSource::UserTemp
-                if path.within(&self.profile) && path.within(&self.temp) && path != &self.temp =>
+        let root = self.root(source)?;
+        if path.within(&self.profile) && path.within(&root) && (directory || path != &root) {
+            if path
+                .as_str()
+                .split('\\')
+                .skip(root.as_str().split('\\').count())
+                .any(sensitive_component)
             {
-                Ok(())
+                return Err(Denial::SensitiveData);
             }
-            _ => Err(Denial::OutsideScope),
+            Ok(())
+        } else {
+            Err(Denial::OutsideScope)
         }
+    }
+    pub(crate) fn directory(
+        &self,
+        source: FileSource,
+        path: &LocalPath,
+    ) -> Result<DirectoryProbe, Denial> {
+        self.check_scope(source, path, true)?;
+        let handles = open_path(path, true)?;
+        deny_browser_profile_ancestors(path, &self.root(source)?, true)?;
+        let entries =
+            std::fs::read_dir(format!(r"\\?\{}", path.as_str())).map_err(denial_from_io)?;
+        Ok(DirectoryProbe {
+            _handles: handles,
+            entries,
+        })
     }
     pub fn snapshot(
         &self,
@@ -127,7 +177,7 @@ impl FilePolicy {
     ) -> Result<FileSnapshot, Denial> {
         let path = LocalPath::parse(path)?;
         self.check_path(source, &path)?;
-        let observed = observe(&path)?;
+        let observed = observe(&path, &self.root(source)?)?;
         self.check_path(source, &observed.path)?;
         Ok(FileSnapshot {
             id,
@@ -141,7 +191,7 @@ impl FilePolicy {
             return Err(Denial::ForeignId);
         }
         self.check_path(snapshot.source, &snapshot.path)?;
-        let current = observe(&snapshot.path)?;
+        let current = observe(&snapshot.path, &self.root(snapshot.source)?)?;
         self.check_path(snapshot.source, &current.path)?;
         if snapshot.path != current.path {
             return Err(Denial::TargetChanged);
@@ -184,7 +234,160 @@ struct Observed {
     metadata: FileMetadata,
 }
 
-fn observe(path: &LocalPath) -> Result<Observed, Denial> {
+pub(crate) struct DirectoryProbe {
+    _handles: Vec<OwnedHandle>,
+    entries: std::fs::ReadDir,
+}
+impl Iterator for DirectoryProbe {
+    type Item = Result<std::path::PathBuf, Denial>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.entries
+            .next()
+            .map(|entry| entry.map(|entry| entry.path()).map_err(denial_from_io))
+    }
+}
+
+fn observe(path: &LocalPath, root: &LocalPath) -> Result<Observed, Denial> {
+    let handles = open_path(path, false)?;
+    deny_browser_profile_ancestors(path, root, false)?;
+    let handle = handles.last().ok_or(Denial::Unavailable)?;
+    let basic: FILE_BASIC_INFO = info(handle, FileBasicInfo)?;
+    let standard: FILE_STANDARD_INFO = info(handle, FileStandardInfo)?;
+    let identity: FILE_ID_INFO = info(handle, FileIdInfo)?;
+    if standard.Directory
+        || standard.DeletePending
+        || standard.EndOfFile < 0
+        || standard.AllocationSize < 0
+    {
+        return Err(Denial::NotRegularFile);
+    }
+    if standard.NumberOfLinks != 1 {
+        return Err(Denial::HardLink);
+    }
+    let allocated_size = if basic.FileAttributes & FILE_ATTRIBUTE_COMPRESSED != 0 {
+        // Ancestors and leaf stay pinned without write/delete sharing for this path-based query.
+        let mut high = 0;
+        unsafe { SetLastError(ERROR_SUCCESS) };
+        let low = unsafe { GetCompressedFileSizeW(path.wide().as_ptr(), &mut high) };
+        if low == u32::MAX && unsafe { GetLastError() } != ERROR_SUCCESS {
+            return Err(last_error());
+        }
+        (u64::from(high) << 32) | u64::from(low)
+    } else {
+        standard.AllocationSize as u64
+    };
+    Ok(Observed {
+        path: final_path(handle)?,
+        metadata: FileMetadata {
+            identity: FileIdentity {
+                volume: identity.VolumeSerialNumber,
+                id: identity.FileId.Identifier,
+            },
+            size: standard.EndOfFile as u64,
+            allocated_size,
+            created: basic.CreationTime,
+            modified: basic.LastWriteTime,
+            changed: basic.ChangeTime,
+            attributes: basic.FileAttributes,
+            links: standard.NumberOfLinks,
+        },
+    })
+}
+
+fn sensitive_component(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    let mut base = lower.as_str();
+    while let Some(shorter) = [
+        "-wal", "-shm", "-journal", ".bak", ".old", ".backup", ".tmp", ".temp",
+    ]
+    .into_iter()
+    .find_map(|suffix| base.strip_suffix(suffix))
+    {
+        base = shorter;
+    }
+    matches!(
+        base,
+        "cookies"
+            | "login data"
+            | "web data"
+            | "network"
+            | "sessions"
+            | "session storage"
+            | "local storage"
+            | "indexeddb"
+            | "service worker"
+            | "webstorage"
+            | "storage"
+            | "cookies.sqlite"
+            | "key3.db"
+            | "key4.db"
+            | "cert8.db"
+            | "cert9.db"
+            | "logins.json"
+            | "sessionstore.jsonlz4"
+            | "sessionstore.js"
+            | "sessionstore-backups"
+            | "places.sqlite"
+            | "formhistory.sqlite"
+            | "webappsstore.sqlite"
+            | "chromeappsstore.sqlite"
+            | "permissions.sqlite"
+            | "content-prefs.sqlite"
+            | "favicons.sqlite"
+            | "bookmarkbackups"
+            | "pkcs11.txt"
+            | "handlers.json"
+            | "xulstore.json"
+            | "containers.json"
+            | "persdict.dat"
+            | "search.json.mozlz4"
+            | "user.js"
+            | "extensions"
+            | "prefs.js"
+            | "local state"
+            | "preferences"
+            | "secure preferences"
+            | "bookmarks"
+            | "current session"
+            | "current tabs"
+            | "last session"
+            | "last tabs"
+    )
+}
+
+fn deny_browser_profile_ancestors(
+    path: &LocalPath,
+    root: &LocalPath,
+    directory: bool,
+) -> Result<(), Denial> {
+    // This only denies scope. Marker metadata is queried while the caller pins all ancestors.
+    let prefixes = path.prefixes();
+    let count = prefixes.len() - usize::from(!directory);
+    for parent in prefixes
+        .into_iter()
+        .take(count)
+        .filter(|parent| parent.within(root))
+    {
+        for marker in [
+            "Local State",
+            "Preferences",
+            "Secure Preferences",
+            "Login Data",
+            "prefs.js",
+            "cookies.sqlite",
+        ] {
+            let target = parent.child(marker)?;
+            match std::fs::symlink_metadata(format!(r"\\?\{}", target.as_str())) {
+                Ok(_) => return Err(Denial::SensitiveData),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(denial_from_io(error)),
+            }
+        }
+    }
+    Ok(())
+}
+
+fn open_path(path: &LocalPath, directory: bool) -> Result<Vec<OwnedHandle>, Denial> {
     let prefixes = path.prefixes();
     let root: Vec<u16> = prefixes[0].as_str().encode_utf16().chain([0]).collect();
     if unsafe { GetDriveTypeW(root.as_ptr()) } != 3 {
@@ -198,7 +401,14 @@ fn observe(path: &LocalPath) -> Result<Observed, Denial> {
         let raw = unsafe {
             CreateFileW(
                 wide.as_ptr(),
-                FILE_READ_ATTRIBUTES | if leaf { DELETE } else { 0 },
+                FILE_READ_ATTRIBUTES
+                    | if leaf && !directory {
+                        DELETE
+                    } else if leaf {
+                        FILE_LIST_DIRECTORY
+                    } else {
+                        0
+                    },
                 FILE_SHARE_READ,
                 ptr::null(),
                 OPEN_EXISTING,
@@ -211,13 +421,24 @@ fn observe(path: &LocalPath) -> Result<Observed, Denial> {
         }
         let handle = unsafe { OwnedHandle::from_raw_handle(raw) };
         let basic: FILE_BASIC_INFO = info(&handle, FileBasicInfo)?;
-        check_attributes(basic.FileAttributes, leaf)?;
+        check_attributes(basic.FileAttributes, leaf && !directory)?;
+        if leaf
+            && directory
+            && basic.FileAttributes
+                & (FILE_ATTRIBUTE_HIDDEN
+                    | FILE_ATTRIBUTE_SYSTEM
+                    | FILE_ATTRIBUTE_READONLY
+                    | FILE_ATTRIBUTE_ENCRYPTED)
+                != 0
+        {
+            return Err(Denial::Protected);
+        }
         let canonical = final_path(&handle)?;
         // Reject short-name aliases, SUBST and unexpected resolution, even inside an allowed scope.
         if canonical != *prefix {
             return Err(Denial::TargetChanged);
         }
-        if !leaf {
+        if !leaf || directory {
             if basic.FileAttributes & FILE_ATTRIBUTE_DIRECTORY == 0 {
                 return Err(Denial::NotRegularFile);
             }
@@ -228,31 +449,7 @@ fn observe(path: &LocalPath) -> Result<Observed, Denial> {
         }
         handles.push(handle);
     }
-    let handle = handles.last().ok_or(Denial::Unavailable)?;
-    let basic: FILE_BASIC_INFO = info(handle, FileBasicInfo)?;
-    let standard: FILE_STANDARD_INFO = info(handle, FileStandardInfo)?;
-    let identity: FILE_ID_INFO = info(handle, FileIdInfo)?;
-    if standard.Directory || standard.DeletePending || standard.EndOfFile < 0 {
-        return Err(Denial::NotRegularFile);
-    }
-    if standard.NumberOfLinks != 1 {
-        return Err(Denial::HardLink);
-    }
-    Ok(Observed {
-        path: final_path(handle)?,
-        metadata: FileMetadata {
-            identity: FileIdentity {
-                volume: identity.VolumeSerialNumber,
-                id: identity.FileId.Identifier,
-            },
-            size: standard.EndOfFile as u64,
-            created: basic.CreationTime,
-            modified: basic.LastWriteTime,
-            changed: basic.ChangeTime,
-            attributes: basic.FileAttributes,
-            links: standard.NumberOfLinks,
-        },
-    })
+    Ok(handles)
 }
 
 fn check_attributes(attributes: u32, leaf: bool) -> Result<(), Denial> {
@@ -318,7 +515,14 @@ fn final_path(handle: &OwnedHandle) -> Result<LocalPath, Denial> {
     LocalPath::parse(&String::from_utf16(&buffer[..len]).map_err(|_| Denial::UnsupportedPath)?)
 }
 fn last_error() -> Denial {
-    match unsafe { GetLastError() } {
+    error_code(unsafe { GetLastError() })
+}
+pub(crate) fn denial_from_io(error: std::io::Error) -> Denial {
+    error_code(error.raw_os_error().unwrap_or(0) as u32)
+}
+fn error_code(code: u32) -> Denial {
+    match code {
+        ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND => Denial::NotPresent,
         ERROR_ACCESS_DENIED | ERROR_PRIVILEGE_NOT_HELD => Denial::AccessDenied,
         ERROR_SHARING_VIOLATION | ERROR_LOCK_VIOLATION => Denial::Locked,
         _ => Denial::Unavailable,

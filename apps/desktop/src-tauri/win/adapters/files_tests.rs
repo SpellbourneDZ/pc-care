@@ -22,6 +22,7 @@ impl Fixture {
         let temp = temp.canonicalize().unwrap();
         let profile = LocalPath::parse(root.join("Profile").to_str().unwrap()).unwrap();
         let policy = FilePolicy {
+            local_app_data: profile.child(r"AppData\Local").unwrap(),
             profile,
             temp: local(&temp),
             protected: vec![local(&root.join("CustomWindows"))],
@@ -104,11 +105,13 @@ fn all_protected_and_unknown_scope_fixtures_are_denied() {
         r"C:\$Recycle.Bin\x",
         r"C:\Config.Msi\x",
     ] {
-        denied(
-            f.policy
-                .check_path(FileSource::UserTemp, &LocalPath::parse(path).unwrap()),
-            Denial::Protected,
-        );
+        for source in FileSource::ALL {
+            denied(
+                f.policy
+                    .check_path(source, &LocalPath::parse(path).unwrap()),
+                Denial::Protected,
+            );
+        }
     }
     denied(
         f.policy.check_path(
@@ -189,7 +192,7 @@ fn real_windows_metadata_identity_and_selected_id_are_revalidated() {
         Denial::TargetChanged,
     );
     // Every comparable metadata field participates; same-size replacement cannot pass.
-    for field in 0..8 {
+    for field in 0..9 {
         let mut changed = snapshot.metadata.clone();
         match field {
             0 => changed.identity.volume ^= 1,
@@ -199,7 +202,8 @@ fn real_windows_metadata_identity_and_selected_id_are_revalidated() {
             4 => changed.modified += 1,
             5 => changed.changed += 1,
             6 => changed.attributes ^= 1,
-            _ => changed.links += 1,
+            7 => changed.links += 1,
+            _ => changed.allocated_size += 1,
         }
         denied(
             check_identity(snapshot.id, snapshot.id, &snapshot.metadata, &changed),
@@ -224,7 +228,7 @@ fn windows_hardlinks_locks_directories_and_missing_files_fail_closed() {
     let dir = f.temp.join("directory");
     fs::create_dir(&dir).unwrap();
     denied(f.snapshot(&dir), Denial::NotRegularFile);
-    denied(f.snapshot(&f.temp.join("absent.txt")), Denial::Unavailable);
+    denied(f.snapshot(&f.temp.join("absent.txt")), Denial::NotPresent);
 }
 
 #[test]
@@ -274,96 +278,10 @@ fn current_user_scope_comes_from_known_folders_without_reading_user_files() {
 
 #[test]
 fn windows_acl_denial_is_visible_and_never_elevated() {
-    use windows_sys::Win32::Security::{Authorization::*, *};
     let f = Fixture::new();
     let path = f.file("acl-denied/acl-fixture.txt");
     let snapshot = f.snapshot(&path).unwrap();
-    fn deny_acl(path: &Path, rights: u32) -> impl Drop {
-        let mut wide = local(path).wide();
-        let mut original_sd = ptr::null_mut();
-        let mut original_dacl = ptr::null_mut();
-        assert_eq!(
-            unsafe {
-                GetNamedSecurityInfoW(
-                    wide.as_ptr(),
-                    SE_FILE_OBJECT,
-                    DACL_SECURITY_INFORMATION,
-                    ptr::null_mut(),
-                    ptr::null_mut(),
-                    &mut original_dacl,
-                    ptr::null_mut(),
-                    &mut original_sd,
-                )
-            },
-            ERROR_SUCCESS
-        );
-        struct Restore {
-            path: Vec<u16>,
-            sd: PSECURITY_DESCRIPTOR,
-            dacl: *mut ACL,
-        }
-        impl Drop for Restore {
-            fn drop(&mut self) {
-                let result = unsafe {
-                    SetNamedSecurityInfoW(
-                        self.path.as_ptr(),
-                        SE_FILE_OBJECT,
-                        DACL_SECURITY_INFORMATION | UNPROTECTED_DACL_SECURITY_INFORMATION,
-                        ptr::null_mut(),
-                        ptr::null_mut(),
-                        self.dacl,
-                        ptr::null(),
-                    )
-                };
-                unsafe { LocalFree(self.sd) };
-                assert_eq!(result, ERROR_SUCCESS, "restore artificial fixture ACL");
-            }
-        }
-        let restore = Restore {
-            path: wide.clone(),
-            sd: original_sd,
-            dacl: original_dacl,
-        };
-        let sddl: Vec<u16> = format!("D:(D;;0x{rights:x};;;WD)(A;;FA;;;WD)")
-            .encode_utf16()
-            .chain([0])
-            .collect();
-        let mut denied_sd = ptr::null_mut();
-        assert_ne!(
-            unsafe {
-                ConvertStringSecurityDescriptorToSecurityDescriptorW(
-                    sddl.as_ptr(),
-                    1,
-                    &mut denied_sd,
-                    ptr::null_mut(),
-                )
-            },
-            0
-        );
-        let mut present = 0;
-        let mut defaulted = 0;
-        let mut denied_dacl = ptr::null_mut();
-        assert_ne!(
-            unsafe {
-                GetSecurityDescriptorDacl(denied_sd, &mut present, &mut denied_dacl, &mut defaulted)
-            },
-            0
-        );
-        let result = unsafe {
-            SetNamedSecurityInfoW(
-                wide.as_mut_ptr(),
-                SE_FILE_OBJECT,
-                DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-                ptr::null_mut(),
-                ptr::null_mut(),
-                denied_dacl,
-                ptr::null(),
-            )
-        };
-        unsafe { LocalFree(denied_sd) };
-        assert_eq!(result, ERROR_SUCCESS);
-        restore
-    }
+
     let parent_restore = deny_acl(path.parent().unwrap(), FILE_DELETE_CHILD);
     let file_restore = deny_acl(&path, DELETE);
     denied(
@@ -471,4 +389,100 @@ fn actual_junctions_and_loops_are_rejected_before_following_children() {
         Denial::ReparsePoint,
     );
     // Keep all synthetic fixtures as test artifacts; no recursive deletion across junctions.
+}
+
+pub(crate) fn deny_acl(path: &Path, rights: u32) -> impl Drop {
+    use windows_sys::Win32::Security::{Authorization::*, *};
+    assert!(
+        local(path).within(&local(
+            &Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../../target/policy-fixtures")
+                .canonicalize()
+                .unwrap()
+        ))
+    );
+    let mut wide = local(path).wide();
+    let mut original_sd = ptr::null_mut();
+    let mut original_dacl = ptr::null_mut();
+    assert_eq!(
+        unsafe {
+            GetNamedSecurityInfoW(
+                wide.as_ptr(),
+                SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION,
+                ptr::null_mut(),
+                ptr::null_mut(),
+                &mut original_dacl,
+                ptr::null_mut(),
+                &mut original_sd,
+            )
+        },
+        ERROR_SUCCESS
+    );
+    struct Restore {
+        path: Vec<u16>,
+        sd: PSECURITY_DESCRIPTOR,
+        dacl: *mut ACL,
+    }
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            let result = unsafe {
+                SetNamedSecurityInfoW(
+                    self.path.as_ptr(),
+                    SE_FILE_OBJECT,
+                    DACL_SECURITY_INFORMATION | UNPROTECTED_DACL_SECURITY_INFORMATION,
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                    self.dacl,
+                    ptr::null(),
+                )
+            };
+            unsafe { LocalFree(self.sd) };
+            assert_eq!(result, ERROR_SUCCESS, "restore artificial fixture ACL");
+        }
+    }
+    let restore = Restore {
+        path: wide.clone(),
+        sd: original_sd,
+        dacl: original_dacl,
+    };
+    let sddl: Vec<u16> = format!("D:(D;;0x{rights:x};;;WD)(A;;FA;;;WD)")
+        .encode_utf16()
+        .chain([0])
+        .collect();
+    let mut denied_sd = ptr::null_mut();
+    assert_ne!(
+        unsafe {
+            ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                sddl.as_ptr(),
+                1,
+                &mut denied_sd,
+                ptr::null_mut(),
+            )
+        },
+        0
+    );
+    let mut present = 0;
+    let mut defaulted = 0;
+    let mut denied_dacl = ptr::null_mut();
+    assert_ne!(
+        unsafe {
+            GetSecurityDescriptorDacl(denied_sd, &mut present, &mut denied_dacl, &mut defaulted)
+        },
+        0
+    );
+    let result = unsafe {
+        SetNamedSecurityInfoW(
+            wide.as_mut_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            denied_dacl,
+            ptr::null(),
+        )
+    };
+    unsafe { LocalFree(denied_sd) };
+    assert_eq!(result, ERROR_SUCCESS);
+    restore
 }

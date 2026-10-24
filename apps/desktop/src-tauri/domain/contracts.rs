@@ -90,6 +90,7 @@ pub enum SafetyClass {
 #[serde(rename_all = "snake_case")]
 pub enum ScanKind {
     Mock,
+    Cleanup,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -141,6 +142,7 @@ pub struct Candidate {
     pub identity: String,
     pub rule_id: String,
     pub bytes: ByteCount,
+    pub logical_bytes: ByteCount,
     pub safety: SafetyClass,
 }
 
@@ -151,6 +153,8 @@ pub struct ScanSnapshot {
     pub task_id: ScanTaskId,
     pub source: ScanKind,
     pub candidates: Vec<Candidate>,
+    pub issues: Vec<ScanIssue>,
+    pub truncated: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -159,7 +163,7 @@ pub struct TaskProgress {
     pub task_id: ScanTaskId,
     pub status: TaskStatus,
     pub processed: u32,
-    pub total: u32,
+    pub total: Option<u32>,
     pub scan_id: Option<ScanId>,
     pub error: Option<ApiError>,
 }
@@ -171,6 +175,27 @@ pub struct CandidatePage {
     pub offset: u32,
     pub total: u32,
     pub candidates: Vec<Candidate>,
+    pub issues: Vec<ScanIssue>,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct ScanIssue {
+    pub rule_id: String,
+    pub reason: super::policy::Denial,
+    pub count: u32,
+    pub sample_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct CleanupRule {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub safety: SafetyClass,
+    pub min_age_hours: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -233,6 +258,7 @@ pub struct StartScanRequest {
     deny_unknown_fields
 )]
 pub enum ApiRequest {
+    GetCleanupRules,
     GetPreferences,
     SavePreferences {
         expected_revision: Option<SettingsRevision>,
@@ -268,6 +294,7 @@ pub enum ApiRequest {
     deny_unknown_fields
 )]
 pub enum ApiResponse {
+    CleanupRules(Vec<CleanupRule>),
     Preferences(SettingsSnapshot),
     ScanStarted { task_id: ScanTaskId },
     Task(TaskProgress),

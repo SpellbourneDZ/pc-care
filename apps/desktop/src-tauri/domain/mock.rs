@@ -17,6 +17,7 @@ pub fn candidates() -> Vec<Candidate> {
         identity: format!("fixture:{key}:v1"),
         rule_id: "mock-fixture".into(),
         bytes: ByteCount(bytes),
+        logical_bytes: ByteCount(bytes),
         safety,
     })
     .collect()
@@ -28,6 +29,7 @@ pub fn revalidate(candidate: &Candidate) -> bool {
             && current.identity == candidate.identity
             && current.display_path == candidate.display_path
             && current.rule_id == candidate.rule_id
+            && current.logical_bytes == candidate.logical_bytes
             && current.bytes == candidate.bytes
             && current.safety == candidate.safety
             && current.source == candidate.source

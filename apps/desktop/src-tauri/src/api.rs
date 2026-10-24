@@ -32,13 +32,30 @@ fn dispatch(
     progress: Channel<TaskProgress>,
 ) -> Result<ApiResponse, ApiError> {
     Ok(match request {
+        ApiRequest::GetCleanupRules => ApiResponse::CleanupRules(crate::domain::cleanup::rules()),
         ApiRequest::GetPreferences => ApiResponse::Preferences(settings.load()?),
         ApiRequest::SavePreferences {
             expected_revision,
             preferences,
         } => ApiResponse::Preferences(settings.save(expected_revision, preferences)?),
         ApiRequest::StartScan(request) => {
-            let task_id = engine.start_scan(request, move |p| progress.send(p).is_ok())?;
+            let task_id = match request.kind {
+                ScanKind::Mock => engine.start_scan(request, move |p| progress.send(p).is_ok())?,
+                ScanKind::Cleanup => {
+                    if request.scenario != MockScenario::Complete {
+                        return Err(ApiError::InvalidRequest);
+                    }
+                    let preferences = settings.load()?.preferences;
+                    let scanner = crate::win::adapters::cleanup::CleanupScanner::current(
+                        &preferences.exclusions,
+                    )?;
+                    engine.start_cleanup_scan(
+                        request.timeout_ms,
+                        move |p| progress.send(p).is_ok(),
+                        move |sink| scanner.scan(sink),
+                    )?
+                }
+            };
             ApiResponse::ScanStarted { task_id }
         }
         ApiRequest::GetTask { task_id } => ApiResponse::Task(engine.get_task(task_id)?),
