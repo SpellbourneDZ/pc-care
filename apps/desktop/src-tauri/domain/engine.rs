@@ -6,6 +6,17 @@ use std::{
     time::{Duration, Instant},
 };
 
+pub enum ScanEvent {
+    Checkpoint,
+    Visited,
+    Candidate(Candidate),
+    Issue(ScanIssue),
+}
+pub type ScanSink<'a> = dyn FnMut(ScanEvent) -> Result<(), ApiError> + 'a;
+const MAX_CANDIDATES: usize = 10_000;
+const MAX_SNAPSHOT_BYTES: usize = 4 * 1024 * 1024;
+const MAX_ISSUES: usize = 128;
+const MAX_VISITED: u32 = 100_000;
 const MAX_TASKS: usize = 32;
 const MAX_PLANS: usize = 32;
 const PLAN_TTL: Duration = Duration::from_secs(30);
@@ -22,6 +33,7 @@ struct State {
     plans: HashMap<PlanId, StoredPlan>,
 }
 struct Task {
+    source: ScanKind,
     progress: TaskProgress,
     started: Instant,
     worker_finished: bool,
@@ -48,15 +60,54 @@ impl Engine {
         request: StartScanRequest,
         emit: impl FnMut(TaskProgress) -> bool + Send + 'static,
     ) -> Result<ScanTaskId, ApiError> {
-        if !self.mock_enabled {
+        if !self.mock_enabled || request.kind != ScanKind::Mock {
             return Err(ApiError::Unsupported);
         }
-        if !(1..=30_000).contains(&request.timeout_ms) {
+        self.start_worker(
+            ScanKind::Mock,
+            request.timeout_ms,
+            Some(mock::COUNT),
+            emit,
+            move |sink| mock_scan(request.scenario, sink),
+        )
+    }
+
+    pub fn start_cleanup_scan(
+        &self,
+        timeout_ms: u32,
+        emit: impl FnMut(TaskProgress) -> bool + Send + 'static,
+        worker: impl FnOnce(&mut ScanSink<'_>) -> Result<(), ApiError> + Send + 'static,
+    ) -> Result<ScanTaskId, ApiError> {
+        self.start_worker(ScanKind::Cleanup, timeout_ms, None, emit, worker)
+    }
+
+    fn start_worker(
+        &self,
+        source: ScanKind,
+        timeout_ms: u32,
+        total: Option<u32>,
+        emit: impl FnMut(TaskProgress) -> bool + Send + 'static,
+        worker: impl FnOnce(&mut ScanSink<'_>) -> Result<(), ApiError> + Send + 'static,
+    ) -> Result<ScanTaskId, ApiError> {
+        let maximum = if source == ScanKind::Mock {
+            30_000
+        } else {
+            300_000
+        };
+        if !(1..=maximum).contains(&timeout_ms) {
             return Err(ApiError::InvalidRequest);
         }
         let id = ScanTaskId::new();
         {
             let mut state = self.lock()?;
+            if source == ScanKind::Cleanup
+                && state
+                    .tasks
+                    .values()
+                    .any(|task| task.source == source && !task.worker_finished)
+            {
+                return Err(ApiError::Capacity);
+            }
             if state.tasks.len() >= MAX_TASKS {
                 let oldest = state
                     .tasks
@@ -74,13 +125,14 @@ impl Engine {
             state.tasks.insert(
                 id,
                 Task {
+                    source,
                     started: Instant::now(),
                     worker_finished: false,
                     progress: TaskProgress {
                         task_id: id,
                         status: TaskStatus::Running,
                         processed: 0,
-                        total: mock::COUNT,
+                        total,
                         scan_id: None,
                         error: None,
                     },
@@ -89,9 +141,9 @@ impl Engine {
         }
         let engine = self.clone();
         if thread::Builder::new()
-            .name("pc-care-mock-scan".into())
+            .name("pc-care-scan".into())
             .spawn(move || {
-                engine.run_scan(id, request, emit);
+                engine.run_worker(id, source, timeout_ms, worker, emit);
                 if let Ok(mut state) = engine.lock()
                     && let Some(task) = state.tasks.get_mut(&id)
                 {
@@ -111,10 +163,28 @@ impl Engine {
         Ok(id)
     }
 
+    #[cfg(test)]
     fn run_scan(
         &self,
         id: ScanTaskId,
         request: StartScanRequest,
+        emit: impl FnMut(TaskProgress) -> bool,
+    ) {
+        self.run_worker(
+            id,
+            request.kind,
+            request.timeout_ms,
+            |sink| mock_scan(request.scenario, sink),
+            emit,
+        );
+    }
+
+    fn run_worker(
+        &self,
+        id: ScanTaskId,
+        source: ScanKind,
+        timeout_ms: u32,
+        worker: impl FnOnce(&mut ScanSink<'_>) -> Result<(), ApiError>,
         mut emit: impl FnMut(TaskProgress) -> bool,
     ) {
         let result = (|| -> Result<(), ApiError> {
@@ -126,32 +196,74 @@ impl Engine {
             if !running {
                 return Ok(());
             }
-            let mut found = Vec::new();
-            for candidate in mock::candidates() {
-                thread::sleep(Duration::from_millis(30));
+            let mut candidates = Vec::new();
+            let mut issues: Vec<ScanIssue> = Vec::new();
+            let mut snapshot_bytes = 0_usize;
+            let mut last_emit = Instant::now();
+            let outcome = worker(&mut |event| {
                 let progress = {
                     let mut state = self.lock()?;
                     let task = state.tasks.get_mut(&id).ok_or(ApiError::NotFound)?;
                     if task.progress.status != TaskStatus::Running {
-                        let progress = task.progress.clone();
-                        drop(state);
-                        emit(progress);
-                        return Ok(());
+                        return Err(ApiError::NotReady);
                     }
-                    if task.started.elapsed() >= Duration::from_millis(request.timeout_ms.into()) {
+                    if task.started.elapsed() >= Duration::from_millis(timeout_ms.into()) {
                         return Err(ApiError::Timeout);
                     }
-                    if request.scenario == MockScenario::AdapterError {
-                        return Err(ApiError::AdapterError);
+                    match event {
+                        ScanEvent::Visited => {
+                            if task.progress.processed >= MAX_VISITED {
+                                return Err(ApiError::Capacity);
+                            }
+                            task.progress.processed += 1;
+                        }
+                        ScanEvent::Candidate(candidate) => {
+                            if candidate.source != source {
+                                return Err(ApiError::Internal);
+                            }
+                            if candidates.len() >= MAX_CANDIDATES {
+                                return Err(ApiError::Capacity);
+                            }
+                            snapshot_bytes += std::mem::size_of::<Candidate>()
+                                + candidate.display_path.len()
+                                + candidate.identity.len()
+                                + candidate.source_key.len()
+                                + candidate.rule_id.len();
+                            if snapshot_bytes > MAX_SNAPSHOT_BYTES {
+                                return Err(ApiError::Capacity);
+                            }
+                            candidates.push(candidate);
+                        }
+                        ScanEvent::Issue(issue) => {
+                            if let Some(group) = issues.iter_mut().find(|group| {
+                                group.rule_id == issue.rule_id && group.reason == issue.reason
+                            }) {
+                                group.count = group.count.saturating_add(issue.count);
+                            } else {
+                                if issues.len() >= MAX_ISSUES {
+                                    return Err(ApiError::Capacity);
+                                }
+                                snapshot_bytes += std::mem::size_of::<ScanIssue>()
+                                    + issue.rule_id.len()
+                                    + issue.sample_path.as_ref().map_or(0, String::len);
+                                if snapshot_bytes > MAX_SNAPSHOT_BYTES {
+                                    return Err(ApiError::Capacity);
+                                }
+                                issues.push(issue);
+                            }
+                        }
+                        ScanEvent::Checkpoint => {}
                     }
-                    found.push(candidate);
-                    task.progress.processed += 1;
                     task.progress.clone()
                 };
-                if !emit(progress) {
-                    return Err(ApiError::Disconnected);
+                if source == ScanKind::Mock || last_emit.elapsed() >= Duration::from_millis(50) {
+                    last_emit = Instant::now();
+                    if !emit(progress) {
+                        return Err(ApiError::Disconnected);
+                    }
                 }
-            }
+                Ok(())
+            });
             let progress = {
                 let mut state = self.lock()?;
                 let task = state.tasks.get_mut(&id).ok_or(ApiError::NotFound)?;
@@ -161,8 +273,20 @@ impl Engine {
                     emit(progress);
                     return Ok(());
                 }
-                if task.started.elapsed() >= Duration::from_millis(request.timeout_ms.into()) {
+                let truncated = outcome == Err(ApiError::Capacity);
+                if !truncated {
+                    outcome?;
+                }
+                if task.started.elapsed() >= Duration::from_millis(timeout_ms.into()) {
                     return Err(ApiError::Timeout);
+                }
+                if truncated {
+                    issues.push(ScanIssue {
+                        rule_id: "scan".into(),
+                        reason: super::policy::Denial::LimitReached,
+                        count: 1,
+                        sample_path: None,
+                    });
                 }
                 let scan_id = ScanId::new();
                 task.progress.status = TaskStatus::Completed;
@@ -173,8 +297,10 @@ impl Engine {
                     ScanSnapshot {
                         id: scan_id,
                         task_id: id,
-                        source: request.kind,
-                        candidates: found,
+                        source,
+                        candidates,
+                        issues,
+                        truncated,
                     },
                 );
                 progress
@@ -229,6 +355,8 @@ impl Engine {
             scan_id: id,
             offset,
             total: scan.candidates.len() as u32,
+            issues: scan.issues.clone(),
+            truncated: scan.truncated,
             candidates: scan
                 .candidates
                 .iter()
@@ -319,6 +447,9 @@ impl Engine {
             .scans
             .get(&stored.plan.scan_id)
             .ok_or(ApiError::NotFound)?;
+        if scan.source != ScanKind::Mock {
+            return Err(ApiError::Unsupported);
+        }
         let mut items = Vec::new();
         for candidate in &stored.plan.targets {
             let unchanged =
@@ -348,6 +479,18 @@ impl Engine {
             items,
         })
     }
+}
+
+fn mock_scan(scenario: MockScenario, sink: &mut ScanSink<'_>) -> Result<(), ApiError> {
+    for candidate in mock::candidates() {
+        thread::sleep(Duration::from_millis(30));
+        if scenario == MockScenario::AdapterError {
+            return Err(ApiError::AdapterError);
+        }
+        sink(ScanEvent::Visited)?;
+        sink(ScanEvent::Candidate(candidate))?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

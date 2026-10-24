@@ -16,6 +16,9 @@
 
 ## Стек и структура
 
+- SPE-61: docs/SPE-61-cleanup-analysis.md. Release read-only cleanup scan через существующий start_scan kind=cleanup/scenario=complete; get_cleanup_rules отдаёт закрытый registry. UserTemp: только .tmp/.temp старше 168h Safe; Default HTTP Cache Chrome/Edge 24h Review. Browser profile markers/секреты/sidecars защищены даже внутри Temp, остальные Temp-форматы пропускаются. Никаких cookies/session/Storage и произвольных roots. UI подключать в SPE-62; cleanup execute пока unsupported до SPE-63.
+- Cleanup Candidate.bytes — Windows-reported allocation, logical_bytes — EndOfFile, identity — непрозрачный полный metadata snapshot; не считать allocation гарантией freed bytes. TaskProgress.total nullable; issues содержат группированные причины/count/первый sample, truncated явно означает неполный анализ. Один cleanup worker; 32 retained tasks, caps 10000 candidates/100000 entries/128 issue groups/4 MiB учитываемых snapshot data. Exclusions фиксируются на старт, перед будущим execute перечитать settings/processes/policy.
+
 - SPE-57: рабочие hash routes, Ctrl+K, Settings через typed IPC и TanStack Query; настройки меняются после backend acknowledgement. Прототип доступен отдельно через «О проекте», обычный запуск не использует mock scan. Контракт хранения — docs/SPE-57-shell-settings.md.
 - Дополнительная проверка настроек: pnpm build:qa и pnpm test:settings. QA EXE — только target/native-qa/release; feature qa-fixtures выключена по умолчанию, принимает только UUID fixtures внутри target/native-fixtures, не публиковать её как обычную сборку. Production native smoke не сохраняет настройки пользователя.
 
@@ -27,7 +30,7 @@
 - Cargo workspace — в корне. pnpm-lock.yaml и Cargo.lock хранить в Git; прямые версии зависимостей фиксировать. Новую зависимость добавлять только при реальной необходимости.
 - IPC SPE-58: один operation_api с закрытым ApiRequest; подробности docs/SPE-58-api.md. Rust contracts.rs — источник TS types, src/generated не редактировать вручную; pnpm types:generate и pnpm types:check. Wire snake_case, UUID строками, bytes десятичными строками.
 - Mock scan только в debug, production отвечает unsupported. execute_plan пока только simulated=true с нулём reclaimed bytes. До реальных эффектов нужны policy/revalidation (SPE-59) и durable outcome recovery (SPE-63); timeout нельзя считать гарантией неисполнения и автоматически повторять execute.
-- SPE-59: docs/SPE-59-policy.md. FilePolicy — backend-only read probe/snapshot/revalidate, не разрешение на удаление. Допуск сейчас только к обычным файлам UserTemp; остальные источники default deny. Exclusions с родительским наследованием ограничивают scope. Настройки/сохранение исключений — SPE-57; правила отбора — SPE-61; связь с реальным executor и устранение финального check/use race — SPE-63.
+- SPE-59: docs/SPE-59-policy.md. FilePolicy — backend-only read probe/snapshot/revalidate, не разрешение на удаление. Начальный допуск SPE-59 — обычные файлы UserTemp; SPE-61 добавляет только фиксированные HTTP-cache roots. Остальные источники default deny. Exclusions с родительским наследованием ограничивают scope. Настройки/сохранение исключений — SPE-57; правила отбора — SPE-61; связь с реальным executor и устранение финального check/use race — SPE-63.
 - Системные операции только в Rust. UI не получает прямого доступа к файловой системе, реестру или shell. Typed IPC и минимальные capabilities, без raw arbitrary-path delete.
 - Без сетевого backend, аккаунтов, рекламы, подписок и телеметрии по умолчанию. Работать offline; не грузить шрифты/ресурсы из сети в runtime.
 - Настройки, исключения, история — локальные, с миграциями; без чувствительных данных в логах. Полное состояние задач и persistence реализовывать в соответствующих issue.

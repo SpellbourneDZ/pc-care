@@ -11,6 +11,135 @@ fn request() -> StartScanRequest {
 }
 
 #[test]
+fn native_workers_group_partial_reasons_and_cannot_execute_real_candidates() {
+    let engine = Engine::new(false);
+    let (tx, rx) = mpsc::channel();
+    engine
+        .start_cleanup_scan(
+            5_000,
+            move |progress| tx.send(progress).is_ok(),
+            |sink| {
+                for path in ["fixture-a", "fixture-b"] {
+                    sink(ScanEvent::Visited)?;
+                    sink(ScanEvent::Issue(ScanIssue {
+                        rule_id: "user-temp-v1".into(),
+                        reason: crate::domain::policy::Denial::AccessDenied,
+                        count: 1,
+                        sample_path: Some(path.into()),
+                    }))?;
+                }
+                let mut candidate = mock::candidates().remove(0);
+                candidate.source = ScanKind::Cleanup;
+                sink(ScanEvent::Candidate(candidate))?;
+                Ok(())
+            },
+        )
+        .unwrap();
+    let events: Vec<_> = rx.iter().collect();
+    assert!(events.iter().all(|p| p.total.is_none()));
+    let final_event = events.last().unwrap();
+    assert_eq!(final_event.status, TaskStatus::Completed);
+    let page = engine
+        .get_scan_result(final_event.scan_id.unwrap(), 0, 500)
+        .unwrap();
+    assert_eq!(page.issues.len(), 1);
+    assert_eq!(page.issues[0].count, 2);
+    assert_eq!(page.issues[0].sample_path.as_deref(), Some("fixture-a"));
+    assert!(!page.truncated);
+    let plan = engine
+        .build_operation_plan(page.scan_id, vec![page.candidates[0].id])
+        .unwrap();
+    assert!(plan.simulated);
+    assert_error(engine.execute_plan(plan.id, true), ApiError::Unsupported);
+}
+
+#[test]
+fn native_candidate_limit_publishes_an_explicitly_truncated_snapshot() {
+    let engine = Engine::new(false);
+    let (tx, rx) = mpsc::channel();
+    engine
+        .start_cleanup_scan(
+            5_000,
+            move |progress| tx.send(progress).is_ok(),
+            |sink| {
+                for _ in 0..=MAX_CANDIDATES {
+                    let mut candidate = mock::candidates().remove(0);
+                    candidate.source = ScanKind::Cleanup;
+                    sink(ScanEvent::Candidate(candidate))?;
+                }
+                Ok(())
+            },
+        )
+        .unwrap();
+    let events: Vec<_> = rx.iter().collect();
+    let last = events.last().unwrap();
+    assert_eq!(last.status, TaskStatus::Completed);
+    let page = engine.get_scan_result(last.scan_id.unwrap(), 0, 1).unwrap();
+    assert_eq!(page.total, MAX_CANDIDATES as u32);
+    assert!(page.truncated);
+    assert!(
+        page.issues
+            .iter()
+            .any(|issue| issue.reason == crate::domain::policy::Denial::LimitReached)
+    );
+}
+
+#[test]
+fn snapshot_string_budget_is_bounded_and_reported() {
+    let engine = Engine::new(false);
+    let (tx, rx) = mpsc::channel();
+    engine
+        .start_cleanup_scan(
+            5_000,
+            move |progress| tx.send(progress).is_ok(),
+            |sink| {
+                let mut candidate = mock::candidates().remove(0);
+                candidate.source = ScanKind::Cleanup;
+                candidate.display_path = "x".repeat(MAX_SNAPSHOT_BYTES);
+                sink(ScanEvent::Candidate(candidate))
+            },
+        )
+        .unwrap();
+    let events: Vec<_> = rx.iter().collect();
+    let page = engine
+        .get_scan_result(events.last().unwrap().scan_id.unwrap(), 0, 1)
+        .unwrap();
+    assert_eq!(page.total, 0);
+    assert!(page.truncated);
+}
+
+#[test]
+fn only_one_cleanup_worker_can_run_even_after_cancellation_until_exit() {
+    let engine = Engine::new(false);
+    let (ready_tx, ready_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel();
+    let id = engine
+        .start_cleanup_scan(
+            5_000,
+            move |progress| {
+                if progress.status == TaskStatus::Running && progress.processed == 0 {
+                    ready_tx.send(()).unwrap();
+                    release_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+                }
+                true
+            },
+            |_| Ok(()),
+        )
+        .unwrap();
+    ready_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert_error(
+        engine.start_cleanup_scan(5_000, |_| true, |_| Ok(())),
+        ApiError::Capacity,
+    );
+    engine.cancel_task(id).unwrap();
+    assert_error(
+        engine.start_cleanup_scan(5_000, |_| true, |_| Ok(())),
+        ApiError::Capacity,
+    );
+    release_tx.send(()).unwrap();
+}
+
+#[test]
 fn cancelled_worker_keeps_its_slot_until_terminal_delivery() {
     let engine = Engine::new(true);
     let (ready_tx, ready_rx) = mpsc::channel();
@@ -32,13 +161,14 @@ fn cancelled_worker_keeps_its_slot_until_terminal_delivery() {
         engine.lock().unwrap().tasks.insert(
             other,
             Task {
+                source: ScanKind::Mock,
                 started: Instant::now(),
                 worker_finished: false,
                 progress: TaskProgress {
                     task_id: other,
                     status: TaskStatus::Running,
                     processed: 0,
-                    total: mock::COUNT,
+                    total: Some(mock::COUNT),
                     scan_id: None,
                     error: None,
                 },
@@ -65,13 +195,14 @@ fn cancellation_before_worker_starts_emits_terminal_once() {
     engine.lock().unwrap().tasks.insert(
         id,
         Task {
+            source: ScanKind::Mock,
             started: Instant::now(),
             worker_finished: false,
             progress: TaskProgress {
                 task_id: id,
                 status: TaskStatus::Cancelled,
                 processed: 0,
-                total: mock::COUNT,
+                total: Some(mock::COUNT),
                 scan_id: None,
                 error: None,
             },
@@ -97,13 +228,14 @@ fn task_and_plan_retention_are_bounded() {
         engine.lock().unwrap().tasks.insert(
             id,
             Task {
+                source: ScanKind::Mock,
                 started: Instant::now(),
                 worker_finished: false,
                 progress: TaskProgress {
                     task_id: id,
                     status: TaskStatus::Running,
                     processed: 0,
-                    total: mock::COUNT,
+                    total: Some(mock::COUNT),
                     scan_id: None,
                     error: None,
                 },
@@ -380,6 +512,7 @@ fn production_disables_mock_and_limits_are_validated() {
 #[test]
 fn hostile_or_unknown_ipc_fields_are_rejected() {
     for request in [
+        r#"{"type":"start_scan","data":{"kind":"cleanup","scenario":"complete","timeout_ms":1000,"path":"C:\\Windows"}}"#,
         r#"{"type":"start_scan","data":{"kind":"mock","scenario":"complete","timeout_ms":1000,"path":"C:\\Windows"}}"#,
         r#"{"type":"execute_plan","data":{"plan_id":"C:\\Windows","explicit_confirmation":true}}"#,
         r#"{"type":"delete_file","data":{"path":"C:\\Windows"}}"#,

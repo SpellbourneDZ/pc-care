@@ -4,4 +4,4 @@ import type { ScanId } from "./ScanId";
 import type { ScanTaskId } from "./ScanTaskId";
 import type { TaskStatus } from "./TaskStatus";
 
-export type TaskProgress = { task_id: ScanTaskId, status: TaskStatus, processed: number, total: number, scan_id: ScanId | null, error: ApiError | null, };
+export type TaskProgress = { task_id: ScanTaskId, status: TaskStatus, processed: number, total: number | null, scan_id: ScanId | null, error: ApiError | null, };

@@ -4,8 +4,11 @@ import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { ru } from '../src/i18n/ru'
 import { startNative } from './native-app'
+import type { ApiReply } from '../src/generated/ApiReply'
+import type { ApiRequest } from '../src/generated/ApiRequest'
+import type { TaskProgress } from '../src/generated/TaskProgress'
 
-test('settings persist across native process restart using only isolated fixtures', async ({
+test('settings persist and cleanup scan stays read-only using only isolated fixtures', async ({
   playwright,
 }, testInfo) => {
   test.skip(process.platform !== 'win32', 'Windows x64 only')
@@ -15,6 +18,10 @@ test('settings persist across native process restart using only isolated fixture
     randomUUID(),
   )
   await mkdir(root, { recursive: true })
+  const temp = resolve(root, 'Profile/AppData/Local/Temp')
+  await mkdir(temp, { recursive: true })
+  const sentinel = resolve(temp, 'artificial-recent-file.txt')
+  await writeFile(sentinel, 'PC Care read-only fixture')
   const binary = resolve(
     import.meta.dirname,
     '../../../target/native-qa/release/pc-care.exe',
@@ -29,6 +36,81 @@ test('settings persist across native process restart using only isolated fixture
   )
   try {
     await first.context.setOffline(true)
+    const analysis = await first.page.evaluate(async () => {
+      const native = (
+        window as unknown as {
+          __TAURI_INTERNALS__: {
+            invoke<T>(
+              command: string,
+              args: Record<string, unknown>,
+            ): Promise<T>
+            transformCallback(
+              callback: (data: { message?: TaskProgress }) => void,
+              once: boolean,
+            ): number
+            unregisterCallback(id: number): void
+          }
+        }
+      ).__TAURI_INTERNALS__
+      const events: TaskProgress[] = []
+      const callback = native.transformCallback((packet) => {
+        if (packet.message) events.push(packet.message)
+      }, false)
+      const call = async (request: ApiRequest) => {
+        const reply = await native.invoke<ApiReply>('operation_api', {
+          request,
+          progress: `__CHANNEL__:${callback}`,
+        })
+        if (reply.status === 'error') throw new Error(reply.error)
+        return reply.value
+      }
+      try {
+        const rules = await call({ type: 'get_cleanup_rules' })
+        const started = await call({
+          type: 'start_scan',
+          data: { kind: 'cleanup', scenario: 'complete', timeout_ms: 5_000 },
+        })
+        if (started.type !== 'scan_started') throw new Error('Missing scan ID')
+        for (let attempt = 0; attempt < 250; attempt++) {
+          const task = await call({
+            type: 'get_task',
+            data: { task_id: started.data.task_id },
+          })
+          if (task.type !== 'task') throw new Error('Missing task')
+          if (task.data.status === 'failed')
+            throw new Error(task.data.error ?? 'Scan failed')
+          if (
+            task.data.scan_id &&
+            events.some((event) => event.status === 'completed')
+          ) {
+            const result = await call({
+              type: 'get_scan_result',
+              data: { scan_id: task.data.scan_id, offset: 0, limit: 500 },
+            })
+            return { rules, result, events }
+          }
+          await new Promise((resolve) => setTimeout(resolve, 20))
+        }
+        throw new Error('No terminal progress received')
+      } finally {
+        native.unregisterCallback(callback)
+      }
+    })
+    if (
+      analysis.rules.type !== 'cleanup_rules' ||
+      analysis.result.type !== 'scan_result'
+    )
+      throw new Error('Unexpected cleanup response')
+    expect(analysis.rules.data).toHaveLength(3)
+    expect(analysis.result.data.candidates).toEqual([])
+    expect(analysis.result.data.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ reason: 'too_recent', count: 1 }),
+      ]),
+    )
+    expect(analysis.result.data.truncated).toBe(false)
+    expect(analysis.events.every((event) => event.total === null)).toBe(true)
+    expect(await readFile(sentinel, 'utf8')).toBe('PC Care read-only fixture')
     await first.page
       .getByRole('button', { name: ru.settings, exact: true })
       .click()
