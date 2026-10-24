@@ -11,6 +11,83 @@ fn request() -> StartScanRequest {
 }
 
 #[test]
+fn cancelled_worker_keeps_its_slot_until_terminal_delivery() {
+    let engine = Engine::new(true);
+    let (ready_tx, ready_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel();
+    let (events_tx, events_rx) = mpsc::channel();
+    let id = engine
+        .start_scan(request(), move |progress| {
+            if progress.status == TaskStatus::Running && progress.processed == 0 {
+                ready_tx.send(()).unwrap();
+                release_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+            }
+            events_tx.send(progress).is_ok()
+        })
+        .unwrap();
+    ready_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    engine.cancel_task(id).unwrap();
+    for _ in 1..MAX_TASKS {
+        let other = ScanTaskId::new();
+        engine.lock().unwrap().tasks.insert(
+            other,
+            Task {
+                started: Instant::now(),
+                worker_finished: false,
+                progress: TaskProgress {
+                    task_id: other,
+                    status: TaskStatus::Running,
+                    processed: 0,
+                    total: mock::COUNT,
+                    scan_id: None,
+                    error: None,
+                },
+            },
+        );
+    }
+    assert_error(engine.start_scan(request(), |_| true), ApiError::Capacity);
+    release_tx.send(()).unwrap();
+    let events: Vec<_> = events_rx.iter().collect();
+    assert_eq!(
+        events
+            .iter()
+            .filter(|p| p.status == TaskStatus::Cancelled)
+            .count(),
+        1
+    );
+    assert_eq!(events.last().unwrap().status, TaskStatus::Cancelled);
+}
+
+#[test]
+fn cancellation_before_worker_starts_emits_terminal_once() {
+    let engine = Engine::new(true);
+    let id = ScanTaskId::new();
+    engine.lock().unwrap().tasks.insert(
+        id,
+        Task {
+            started: Instant::now(),
+            worker_finished: false,
+            progress: TaskProgress {
+                task_id: id,
+                status: TaskStatus::Cancelled,
+                processed: 0,
+                total: mock::COUNT,
+                scan_id: None,
+                error: None,
+            },
+        },
+    );
+    let mut events = Vec::new();
+    engine.run_scan(id, request(), |progress| {
+        events.push(progress);
+        true
+    });
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].status, TaskStatus::Cancelled);
+    assert!(engine.lock().unwrap().scans.is_empty());
+}
+
+#[test]
 fn task_and_plan_retention_are_bounded() {
     let engine = Engine::new(true);
     let mut ids = Vec::new();
@@ -21,6 +98,7 @@ fn task_and_plan_retention_are_bounded() {
             id,
             Task {
                 started: Instant::now(),
+                worker_finished: false,
                 progress: TaskProgress {
                     task_id: id,
                     status: TaskStatus::Running,
@@ -34,6 +112,13 @@ fn task_and_plan_retention_are_bounded() {
     }
     assert_error(engine.start_scan(request(), |_| true), ApiError::Capacity);
     engine.cancel_task(ids[0]).unwrap();
+    engine
+        .lock()
+        .unwrap()
+        .tasks
+        .get_mut(&ids[0])
+        .unwrap()
+        .worker_finished = true;
     let (scan_id, _) = scan(&engine);
     assert_eq!(engine.lock().unwrap().tasks.len(), MAX_TASKS);
     assert_error(engine.get_task(ids[0]), ApiError::NotFound);

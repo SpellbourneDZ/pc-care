@@ -37,7 +37,7 @@ ApiReply — union ok/value или error/code. Функция operationApi в sr
 
 ## Память и жизненный цикл
 
-В памяти сохраняются максимум 32 задачи/snapshots и 32 активных плана. При новом scan вытесняется самая старая terminal-задача вместе со snapshot/планами; работающие задачи не вытесняются. Когда все slots заняты работающими задачами — capacity. Планы очищаются при создании следующего; использованные/просроченные ID могут стать not_found. После перезапуска все ID недействительны; persistence/history — отдельная задача.
+В памяти сохраняются максимум 32 задачи/snapshots и 32 активных плана. При новом scan вытесняется самая старая terminal-задача после завершения её worker вместе со snapshot/планами; работающие задачи не вытесняются. Когда все slots заняты работающими задачами — capacity. Планы очищаются при создании следующего; использованные/просроченные ID могут стать not_found. После перезапуска все ID недействительны; persistence/history — отдельная задача.
 
 В mock всегда три искусственных кандидата. Эти ограничения не являются заявлением о готовности сканера больших дисков.
 
@@ -49,6 +49,6 @@ Frontend: typed request/response, private-channel progress, domain/transport err
 
 Native release smoke проверяет настоящий IPC в WebView2: доступ к разрешённому запросу, typed not_found, отказ в mock scan и отклонение произвольной delete_file операции. Реальных пользовательских файлов/реестра в тестах нет.
 
-Локально 24.10.2026 на Windows 11 прошли: 11 Rust tests, 6 frontend tests, 3 browser smoke, types:check, check/lint/format, release build и native smoke. Дополнительно проверен настоящий TypeScript-клиент через Vite/debug WebView2: progress, pagination, plan/confirmation, simulation, cancel, timeout, adapter error. Эта дополнительная debug-проверка выполнена локально, отдельно от автоматического release smoke.
+Локально 24.10.2026 на Windows 11 прошли: 13 Rust tests, 6 frontend tests, 3 browser smoke, types:check, check/lint/format, release build и native smoke. Дополнительно проверен настоящий TypeScript-клиент через Vite/debug WebView2: progress, pagination, plan/confirmation, simulation, cancel, timeout, adapter error. Эта дополнительная debug-проверка выполнена локально, отдельно от автоматического release smoke.
 
 UI не меняется и не показывает mock findings пользователю. Новые скриншоты для этой backend-задачи не требуются; монохромная foundation остаётся прежней.

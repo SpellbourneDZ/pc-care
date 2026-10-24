@@ -24,6 +24,7 @@ struct State {
 struct Task {
     progress: TaskProgress,
     started: Instant,
+    worker_finished: bool,
 }
 struct StoredPlan {
     plan: OperationPlan,
@@ -60,7 +61,7 @@ impl Engine {
                 let oldest = state
                     .tasks
                     .iter()
-                    .filter(|(_, task)| task.progress.status != TaskStatus::Running)
+                    .filter(|(_, task)| task.worker_finished)
                     .min_by_key(|(_, task)| task.started)
                     .map(|(id, _)| *id)
                     .ok_or(ApiError::Capacity)?;
@@ -74,6 +75,7 @@ impl Engine {
                 id,
                 Task {
                     started: Instant::now(),
+                    worker_finished: false,
                     progress: TaskProgress {
                         task_id: id,
                         status: TaskStatus::Running,
@@ -90,10 +92,20 @@ impl Engine {
             .name("pc-care-mock-scan".into())
             .spawn(move || {
                 engine.run_scan(id, request, emit);
+                if let Ok(mut state) = engine.lock()
+                    && let Some(task) = state.tasks.get_mut(&id)
+                {
+                    task.worker_finished = true;
+                }
             })
             .is_err()
         {
             self.finish_error(id, ApiError::Internal)?;
+            self.lock()?
+                .tasks
+                .get_mut(&id)
+                .ok_or(ApiError::NotFound)?
+                .worker_finished = true;
             return Err(ApiError::Internal);
         }
         Ok(id)
@@ -107,8 +119,12 @@ impl Engine {
     ) {
         let result = (|| -> Result<(), ApiError> {
             let initial = self.get_task(id)?;
+            let running = initial.status == TaskStatus::Running;
             if !emit(initial) {
                 return Err(ApiError::Disconnected);
+            }
+            if !running {
+                return Ok(());
             }
             let mut found = Vec::new();
             for candidate in mock::candidates() {
