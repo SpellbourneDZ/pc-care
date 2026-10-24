@@ -6,3 +6,4 @@ gen
 pnpm-lock.yaml
 test-results
 playwright-report
+apps/desktop/src/generated

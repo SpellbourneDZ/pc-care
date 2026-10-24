@@ -77,7 +77,7 @@ pnpm test:native
 
 Следуем [официальной инструкции shadcn для Vite](https://ui.shadcn.com/docs/installation/vite): Tailwind Vite plugin, alias `@/*`, `components.json`, локальные компоненты `src/ui`. Источник и изменения описаны в [UI foundation](ui-foundation.md).
 
-Нет пользовательских IPC-команд и системных plugins; у окна пустой список permissions. Production CSP разрешает только локальные ресурсы; dev CSP отдельно допускает локальный HMR. Предварительный app identifier `local.pccare.desktop` не является утверждённым публичным именем.
+Системных plugins нет; main имеет только allow-operation-api для закрытого typed IPC. Mock scan доступен в debug, release возвращает unsupported. Исполнение планов пока только симуляция, без Windows effects. Production CSP разрешает только локальные ресурсы; dev CSP отдельно допускает локальный HMR. Предварительный app identifier `local.pccare.desktop` не является утверждённым публичным именем. Контракт и генерация типов: [SPE-58 API](SPE-58-api.md).
 
 NSIS current-user намечен конфигурацией, bundling выключен. Установщик, подпись, clean Windows 10/11 VM и merge protection относятся к последующим задачам/настройке GitHub. Проверки CI видны в PR; branch protection будет настроен в SPE-60.
 

@@ -1,1 +1,5 @@
-//! Pure domain logic belongs here. Typed operation contracts are scoped to SPE-58.
+//! Typed operation contracts and mock-only execution. No Windows effects.
+pub mod bindings;
+pub mod contracts;
+pub mod engine;
+mod mock;

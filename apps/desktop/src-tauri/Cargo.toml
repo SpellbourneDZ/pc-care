@@ -13,4 +13,10 @@ name = "pc_care"
 tauri-build = { version = "=2.7.4", features = [] }
 
 [dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
 tauri = { version = "=2.12.5", features = [] }
+ts-rs = { version = "=12.0.1", features = ["no-serde-warnings"] }
+uuid = { version = "=1.29.0", features = ["v4", "serde"] }
+
+[dev-dependencies]
+serde_json = "=1.0.154"
