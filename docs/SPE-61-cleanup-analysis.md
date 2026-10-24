@@ -45,6 +45,8 @@ Scan не создаёт/изменяет/удаляет файлов. Read prob
 {"type":"start_scan","data":{"kind":"cleanup","scenario":"complete","timeout_ms":300000}}
 ```
 
+С SPE-62 `get_cleanup_rules` возвращает `CleanupCatalog { rules, max_plan_items, fixture_mode }`; тип генерируется Rust, все callers обновлены.
+
 `scenario` сохранён ради совместимости mock API; для cleanup разрешён только complete. `get_task`, `cancel_task`, `get_scan_result` и Channel остаются общими. Cleanup поддерживается и в release; mock по-прежнему выключен там. Capabilities не расширены.
 
 Progress: processed — просмотренные entries, включая директории; total=null, поскольку предварительного полного обхода нет. Первое/терминальное событие обязательны, промежуточные обновления ограничены примерно 20 в секунду. Timeout 1–300000 мс, cancel кооперативный между probes. Долгий kernel call нельзя прервать этим timeout; IPC acknowledgement timeout также не доказывает отмену работы. Автоматических повторов нет.

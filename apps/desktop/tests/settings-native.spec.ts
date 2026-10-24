@@ -101,7 +101,8 @@ test('settings persist and cleanup scan stays read-only using only isolated fixt
       analysis.result.type !== 'scan_result'
     )
       throw new Error('Unexpected cleanup response')
-    expect(analysis.rules.data).toHaveLength(3)
+    expect(analysis.rules.data.rules).toHaveLength(3)
+    expect(analysis.rules.data.fixture_mode).toBe(true)
     expect(analysis.result.data.candidates).toEqual([])
     expect(analysis.result.data.issues).toEqual(
       expect.arrayContaining([

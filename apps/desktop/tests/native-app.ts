@@ -9,6 +9,7 @@ export async function startNative(
   binary: string,
   profile: string,
   fixtureRoot?: string,
+  aged = false,
 ) {
   await access(binary)
   const server = createServer()
@@ -28,6 +29,7 @@ export async function startNative(
     env: {
       ...process.env,
       PC_CARE_FIXTURE_ROOT: fixtureRoot,
+      PC_CARE_FIXTURE_AGED: aged ? '1' : '0',
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port} --remote-debugging-address=127.0.0.1`,
       WEBVIEW2_USER_DATA_FOLDER: profile,
     },
@@ -77,7 +79,7 @@ export async function startNative(
     })
     // CDP can attach before Tauri leaves its initial blank page.
     await expect(
-      page.getByRole('heading', { name: ru.moduleNotReady }),
+      page.getByRole('heading', { name: ru.overview, exact: true }),
     ).toBeVisible()
     await page.waitForLoadState('load')
     return { page, context, errors, close }

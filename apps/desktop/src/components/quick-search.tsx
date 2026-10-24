@@ -34,13 +34,18 @@ export function QuickSearch({
   useEffect(() => {
     const handle = (event: KeyboardEvent) => {
       if (event.ctrlKey && !event.altKey && event.key.toLowerCase() === 'k') {
+        if (
+          !open &&
+          document.querySelector('[role="dialog"], [role="alertdialog"]')
+        )
+          return
         event.preventDefault()
         setOpen((previous) => !previous)
       }
     }
     window.addEventListener('keydown', handle)
     return () => window.removeEventListener('keydown', handle)
-  }, [])
+  }, [open])
   const choose = (target: PageId) => {
     setOpen(false)
     onNavigate(target)

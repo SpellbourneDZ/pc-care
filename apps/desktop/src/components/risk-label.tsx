@@ -1,8 +1,8 @@
 import { CircleAlert, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { ru } from '@/i18n/ru'
 import { Badge } from '@/ui/badge'
-import type { Risk } from '@/preview/data'
-export function RiskLabel({ risk }: { risk: Risk }) {
+import type { SafetyClass } from '@/generated/SafetyClass'
+export function RiskLabel({ risk }: { risk: SafetyClass }) {
   const Icon =
     risk === 'safe'
       ? ShieldCheck

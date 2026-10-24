@@ -32,7 +32,11 @@ fn dispatch(
     progress: Channel<TaskProgress>,
 ) -> Result<ApiResponse, ApiError> {
     Ok(match request {
-        ApiRequest::GetCleanupRules => ApiResponse::CleanupRules(crate::domain::cleanup::rules()),
+        ApiRequest::GetCleanupRules => ApiResponse::CleanupRules(CleanupCatalog {
+            rules: crate::domain::cleanup::rules(),
+            fixture_mode: cfg!(feature = "qa-fixtures"),
+            max_plan_items: crate::domain::engine::MAX_PLAN_ITEMS as u32,
+        }),
         ApiRequest::GetPreferences => ApiResponse::Preferences(settings.load()?),
         ApiRequest::SavePreferences {
             expected_revision,
@@ -85,6 +89,22 @@ mod tests {
 
     fn silent_channel() -> Channel<TaskProgress> {
         Channel::new(|_| Ok(()))
+    }
+
+    #[test]
+    fn cleanup_catalog_reports_preview_boundary_and_build_provenance() {
+        let ApiResponse::CleanupRules(catalog) = super::dispatch(
+            &Engine::new(false),
+            &SettingsStore::new(None),
+            ApiRequest::GetCleanupRules,
+            silent_channel(),
+        )
+        .unwrap() else {
+            panic!("unexpected catalog")
+        };
+        assert_eq!(catalog.rules.len(), 3);
+        assert_eq!(catalog.max_plan_items, 500);
+        assert_eq!(catalog.fixture_mode, cfg!(feature = "qa-fixtures"));
     }
 
     #[test]
