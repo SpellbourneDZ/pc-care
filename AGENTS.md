@@ -69,6 +69,16 @@
 
 ## Работа и проверки
 
+### Навыки разработки
+
+- Владелец попросил использовать ponytail, deslop/serega, sasha, коллекции [Jakub](https://jakub.kr/skills) и [Emil](https://emilkowal.ski/skill). Перед применением читать соответствующий SKILL.md и нужные references; выбирать навыки по задаче, не запускать всю коллекцию на каждом изменении.
+- `ponytail` — минимальное полное решение, проверка затронутых callers и честные ограничения. Установлен плагином: `C:/Users/spell/.codex/plugins/cache/ponytail/ponytail/5.3.2/skills/ponytail/SKILL.md`.
+- `sasha` — русские тексты интерфейса и документации; `serega-gentle` / `serega-emotional` — анимация текста, когда она оправдана сценарием. Источник: [mishanaer/deslop](https://github.com/mishanaer/deslop/tree/c38287513d3d1e4b04be0d349380633c1a9d49f2). Установлены в `C:/Users/spell/.codex/skills/<name>/SKILL.md`.
+- Коллекция Jakub: 14 навыков из [jakubkrehel/skills](https://github.com/jakubkrehel/skills/tree/019ab7c199154f4509b55f12d84a4f5b578dc606/skills), включая `better-interface`, `better-accessibility`, `better-layout`, `better-typography`, `better-colors`, `better-ui`, `better-writing`, `state-machine`. Локально: `C:/Users/spell/.codex/skills/<name>/SKILL.md`.
+- Коллекция Emil: 15 навыков из [emilkowalski/skill](https://github.com/emilkowalski/skill/tree/2d228630ba1446365f614a108cb8252f1feda202/skills), включая `emil-design-eng`, `animate`, `animation-performance`, `review-animations`, `improve-animations`, `break-ui`. Локально: `C:/Users/spell/.codex/skills/<name>/SKILL.md`. Навыки Swift/Expo/mobile применять только к соответствующим задачам; стек Windows/Tauri не менять.
+- Навыки не заменяют Linear, утверждённую архитектуру и требования безопасности. Сохранять монохромную палитру, локальные ресурсы, доступность и reduced motion. Анимация не должна задерживать действия, скрывать результат операции или заменять явное подтверждение; зависимости добавлять только при необходимости. Установка навыка сама по себе не требует изменения интерфейса.
+- Владелец разрешил работать автономно в своё отсутствие. Не ждать ответа для обычных технических решений; при внешнем блокере фиксировать ограничение и продолжать независимую работу. Это не отменяет запреты на автоматическое слияние PR, Done без приёмки и небезопасные системные тесты.
+
 - SPE-60: pnpm build:installer / pnpm test:installer собирают только unsigned draft NSIS + PE/hash smoke, не запускают installer. Для install/uninstall нужен snapshot VM; см. docs/SPE-60-testing.md и SECURITY.md. У main required windows/GitHub Actions 15368, strict/enforce admins; stacked feature branches правилом не защищены, не сливать без владельца.
 
 1. Прочитать Linear, затронутый код/всех callers и локальные AGENTS; описать небольшой план и риски.
