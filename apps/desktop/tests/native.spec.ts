@@ -64,6 +64,9 @@ test('release executable renders offline in Windows WebView2', async ({
     if (!page) throw new Error('WebView2 page is missing')
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
+    // CDP can attach before Tauri leaves its initial blank page.
+    await expect(page.getByRole('heading', { name: ru.emptyTitle })).toBeVisible()
+    await page.waitForLoadState('load')
     await context.setOffline(true)
     await page.reload()
     await expect(
