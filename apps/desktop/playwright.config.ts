@@ -22,6 +22,22 @@ export default defineConfig({
       name: 'compact',
       use: { colorScheme: 'light', viewport: { width: 720, height: 520 } },
     },
+    {
+      name: 'scale-125',
+      use: {
+        colorScheme: 'light',
+        viewport: { width: 1280, height: 720 },
+        deviceScaleFactor: 1.25,
+      },
+    },
+    {
+      name: 'scale-150',
+      use: {
+        colorScheme: 'dark',
+        viewport: { width: 1280, height: 720 },
+        deviceScaleFactor: 1.5,
+      },
+    },
   ],
   webServer: {
     command: 'pnpm dev:web',
