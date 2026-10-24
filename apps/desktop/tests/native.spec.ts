@@ -4,6 +4,7 @@ import { createServer } from 'node:net'
 import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { ru } from '../src/i18n/ru'
+import type { ApiReply } from '../src/generated/ApiReply'
 
 test('release executable renders offline in Windows WebView2', async ({
   playwright,
@@ -77,6 +78,48 @@ test('release executable renders offline in Windows WebView2', async ({
       await about.evaluate((element) => getComputedStyle(element).display),
     ).toBe('inline-flex')
     expect(errors).toEqual([])
+    const apiResults = await page.evaluate(async () => {
+      const native = (
+        window as unknown as {
+          __TAURI_INTERNALS__: {
+            invoke<T>(
+              command: string,
+              args: Record<string, unknown>,
+            ): Promise<T>
+            transformCallback(
+              callback: (data: unknown) => void,
+              once: boolean,
+            ): number
+          }
+        }
+      ).__TAURI_INTERNALS__
+      const call = (request: unknown) =>
+        native.invoke<ApiReply>('operation_api', {
+          request,
+          progress: `__CHANNEL__:${native.transformCallback(() => {}, true)}`,
+        })
+      const missing = await call({
+        type: 'get_task',
+        data: { task_id: '11111111-1111-4111-8111-111111111111' },
+      })
+      const unavailable = await call({
+        type: 'start_scan',
+        data: { kind: 'mock', scenario: 'complete', timeout_ms: 1000 },
+      })
+      let arbitraryDenied = false
+      try {
+        await call({ type: 'delete_file', data: { path: 'C:/Windows' } })
+      } catch {
+        arbitraryDenied = true
+      }
+      return { missing, unavailable, arbitraryDenied }
+    })
+    expect(apiResults.missing).toEqual({ status: 'error', error: 'not_found' })
+    expect(apiResults.unavailable).toEqual({
+      status: 'error',
+      error: 'unsupported',
+    })
+    expect(apiResults.arbitraryDenied).toBe(true)
     await page.screenshot({ path: testInfo.outputPath('webview2.png') })
   } finally {
     await browser?.close()
