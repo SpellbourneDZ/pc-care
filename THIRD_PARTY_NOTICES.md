@@ -1,6 +1,8 @@
 # Third-party notices
 
-The generated Button in apps/desktop/src/ui/button.tsx is adapted from shadcn/ui.
+The components in apps/desktop/src/ui and the use-mobile hook are adapted from shadcn/ui
+through its official CLI (Radix Nova). Local customizations include monochrome tokens,
+Russian accessible labels, focus/reduced motion, sizing and controlled-state fixes.
 Upstream: https://github.com/shadcn-ui/ui/blob/main/LICENSE.md
 
 MIT License

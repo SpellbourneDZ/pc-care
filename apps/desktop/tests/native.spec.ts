@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { ru } from '../src/i18n/ru'
 import type { ApiReply } from '../src/generated/ApiReply'
+import { checkPrototypeFlow } from './ui-flow'
 
 test('release executable renders offline in Windows WebView2', async ({
   playwright,
@@ -64,6 +65,13 @@ test('release executable renders offline in Windows WebView2', async ({
     if (!page) throw new Error('WebView2 page is missing')
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
+    page.on('console', (message) => {
+      if (
+        message.type() === 'error' &&
+        /Content Security Policy/i.test(message.text())
+      )
+        errors.push(message.text())
+    })
     // CDP can attach before Tauri leaves its initial blank page.
     await expect(
       page.getByRole('heading', { name: ru.emptyTitle }),
@@ -75,13 +83,13 @@ test('release executable renders offline in Windows WebView2', async ({
       page.getByRole('heading', { name: ru.emptyTitle }),
     ).toBeVisible()
     const about = page.getByRole('button', { name: ru.about })
-    await page.keyboard.press('Tab')
+    await about.focus()
     await expect(about).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(page.getByText(ru.aboutDescription)).toBeVisible()
-    expect(
-      await about.evaluate((element) => getComputedStyle(element).display),
-    ).toBe('inline-flex')
+    await page.keyboard.press('Escape')
+    await expect(about).toBeFocused()
+    await checkPrototypeFlow(page)
     expect(errors).toEqual([])
     const apiResults = await page.evaluate(async () => {
       const native = (
