@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Check, CircleAlert, LoaderCircle, Plus, Trash2 } from 'lucide-react'
 import { ru } from '@/i18n/ru'
 import type { Preferences } from '@/generated/Preferences'
@@ -38,7 +38,18 @@ export function PreferencesPanel({
 }) {
   const [path, setPath] = useState('')
   const input = useRef<HTMLInputElement>(null)
-  const focusPath = () => requestAnimationFrame(() => input.current?.focus())
+  const pendingFocus = useRef(false)
+  const confirmedRemoval = useRef(false)
+  useLayoutEffect(() => {
+    if (!saving && pendingFocus.current) {
+      input.current?.focus()
+      pendingFocus.current = false
+    }
+  }, [saving, preferences, error])
+  const saveExclusions = (value: Preferences) => {
+    pendingFocus.current = true
+    return onSave(value)
+  }
   if (pending)
     return (
       <p className="notice" role="status">
@@ -95,13 +106,12 @@ export function PreferencesPanel({
               onSubmit={(event) => {
                 event.preventDefault()
                 if (path.trim() && !disabled)
-                  void onSave({
+                  void saveExclusions({
                     ...preferences,
                     exclusions: [...preferences.exclusions, path.trim()],
                   })
                     .then(() => {
                       setPath('')
-                      focusPath()
                     })
                     .catch(() => {})
               }}
@@ -143,7 +153,18 @@ export function PreferencesPanel({
                             <Trash2 aria-hidden="true" />
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent className="confirm-dialog">
+                        <AlertDialogContent
+                          className="confirm-dialog"
+                          onCloseAutoFocus={(event) => {
+                            if (confirmedRemoval.current) {
+                              // The confirmed trigger can disappear before Radix restores focus.
+                              event.preventDefault()
+                              confirmedRemoval.current = false
+                              if (!input.current?.disabled)
+                                input.current?.focus()
+                            }
+                          }}
+                        >
                           <AlertDialogHeader>
                             <AlertDialogTitle>
                               {ru.removeExclusion}
@@ -157,14 +178,13 @@ export function PreferencesPanel({
                             <AlertDialogCancel>{ru.cancel}</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => {
-                                void onSave({
+                                confirmedRemoval.current = true
+                                void saveExclusions({
                                   ...preferences,
                                   exclusions: preferences.exclusions.filter(
                                     (value) => value !== exclusion,
                                   ),
-                                })
-                                  .then(focusPath)
-                                  .catch(() => {})
+                                }).catch(() => {})
                               }}
                             >
                               {ru.removeExclusion}
