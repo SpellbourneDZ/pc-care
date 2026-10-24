@@ -1,21 +1,42 @@
 use crate::domain::{contracts::*, engine::Engine};
+use crate::win::adapters::preferences::SettingsStore;
 use tauri::{State, ipc::Channel};
 
 #[tauri::command]
-pub fn operation_api(
+pub async fn operation_api(
     request: ApiRequest,
     progress: Channel<TaskProgress>,
     engine: State<'_, Engine>,
-) -> ApiReply {
-    dispatch(&engine, request, progress).into()
+    settings: State<'_, SettingsStore>,
+) -> Result<ApiReply, ApiError> {
+    let engine = engine.inner().clone();
+    let settings = settings.inner().clone();
+    Ok(
+        match tauri::async_runtime::spawn_blocking(move || {
+            dispatch(&engine, &settings, request, progress)
+        })
+        .await
+        {
+            Ok(result) => result.into(),
+            Err(_) => ApiReply::Error {
+                error: ApiError::Internal,
+            },
+        },
+    )
 }
 
 fn dispatch(
     engine: &Engine,
+    settings: &SettingsStore,
     request: ApiRequest,
     progress: Channel<TaskProgress>,
 ) -> Result<ApiResponse, ApiError> {
     Ok(match request {
+        ApiRequest::GetPreferences => ApiResponse::Preferences(settings.load()?),
+        ApiRequest::SavePreferences {
+            expected_revision,
+            preferences,
+        } => ApiResponse::Preferences(settings.save(expected_revision, preferences)?),
         ApiRequest::StartScan(request) => {
             let task_id = engine.start_scan(request, move |p| progress.send(p).is_ok())?;
             ApiResponse::ScanStarted { task_id }
@@ -52,6 +73,10 @@ mod tests {
     #[test]
     fn dispatch_serialization_channels_and_plan_roundtrip() {
         let engine = Engine::new(true);
+        let settings = SettingsStore::new(None);
+        let dispatch = |engine: &Engine, request, channel| {
+            super::dispatch(engine, &settings, request, channel)
+        };
         let (tx, rx) = mpsc::channel();
         let channel = Channel::new(move |body| {
             tx.send(body.deserialize::<TaskProgress>().unwrap())

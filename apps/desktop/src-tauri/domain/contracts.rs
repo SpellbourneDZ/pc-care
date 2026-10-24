@@ -23,6 +23,39 @@ id!(ScanTaskId);
 id!(ScanId);
 id!(CandidateId);
 id!(PlanId);
+id!(SettingsRevision);
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum Theme {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum Language {
+    #[default]
+    Ru,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct Preferences {
+    pub theme: Theme,
+    pub language: Language,
+    pub exclusions: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct SettingsSnapshot {
+    pub schema_version: u32,
+    pub revision: Option<SettingsRevision>,
+    pub preferences: Preferences,
+}
 
 // JSON decimal strings preserve file sizes above JavaScript's safe integer range.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -93,6 +126,9 @@ pub enum ApiError {
     Disconnected,
     Internal,
     Transport,
+    SettingsInvalid,
+    SettingsUnavailable,
+    SettingsConflict,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -197,6 +233,11 @@ pub struct StartScanRequest {
     deny_unknown_fields
 )]
 pub enum ApiRequest {
+    GetPreferences,
+    SavePreferences {
+        expected_revision: Option<SettingsRevision>,
+        preferences: Preferences,
+    },
     StartScan(StartScanRequest),
     GetTask {
         task_id: ScanTaskId,
@@ -227,6 +268,7 @@ pub enum ApiRequest {
     deny_unknown_fields
 )]
 pub enum ApiResponse {
+    Preferences(SettingsSnapshot),
     ScanStarted { task_id: ScanTaskId },
     Task(TaskProgress),
     ScanResult(CandidatePage),

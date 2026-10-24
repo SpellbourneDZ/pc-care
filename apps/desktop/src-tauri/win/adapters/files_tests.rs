@@ -391,7 +391,7 @@ fn windows_long_paths_remain_local_and_revalidate() {
 }
 
 // Junctions need no Developer Mode/admin. Only a newly created fixture directory is modified.
-fn junction(link: &Path, target: &Path) {
+pub(crate) fn junction(link: &Path, target: &Path) {
     use windows_sys::Win32::System::{IO::DeviceIoControl, Ioctl::FSCTL_SET_REPARSE_POINT};
     assert!(
         link.starts_with(

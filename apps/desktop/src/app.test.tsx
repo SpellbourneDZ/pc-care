@@ -1,11 +1,14 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { expect, test, vi } from 'vitest'
+import { beforeEach, expect, test, vi } from 'vitest'
 import { App } from './app'
 import { ru } from './i18n/ru'
+import { PreviewWorkspace } from './preview/workspace'
 import { CleanupScreen } from './preview/cleanup'
 import { StartupScreen } from './preview/startup'
 import { AppsScreen } from './preview/apps'
+
+beforeEach(() => window.history.replaceState(null, '', '#/preview/overview'))
 
 test('starts with prototype provenance and opens/closes about with keyboard', async () => {
   const user = userEvent.setup()
@@ -89,8 +92,14 @@ test('app search handles no matches and uninstall preview requires confirmation'
 test('cancelling a simulated scan prevents delayed findings', async () => {
   vi.useFakeTimers()
   try {
-    render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: ru.findJunk }))
+    render(
+      <PreviewWorkspace
+        page="cleanup"
+        onNavigate={() => {}}
+        onExit={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: ru.scan }))
     expect(screen.getByRole('heading', { name: ru.loading })).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: ru.cancel }))
     await act(() => vi.advanceTimersByTimeAsync(1000))

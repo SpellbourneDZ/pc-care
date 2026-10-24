@@ -1,148 +1,163 @@
-import { useEffect, useRef, useState } from 'react'
-import { FlaskConical, History } from 'lucide-react'
+import { useState } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ru } from '@/i18n/ru'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/ui/sidebar'
 import { TooltipProvider } from '@/ui/tooltip'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/ui/select'
+import { Button } from '@/ui/button'
 import { AppNavigation, ThemeSelect } from '@/components/app-navigation'
-import { PreviewContent } from '@/components/preview-state'
-import { useTheme } from '@/hooks/use-theme'
-import type { PageId, PreviewState } from '@/preview/data'
-import { OverviewScreen } from '@/preview/overview'
-import { CleanupScreen } from '@/preview/cleanup'
-import { DisksScreen } from '@/preview/disks'
-import { StartupScreen } from '@/preview/startup'
-import { AppsScreen } from '@/preview/apps'
-export function App() {
-  const [page, setPage] = useState<PageId>('overview')
-  const [state, setState] = useState<PreviewState>('empty')
-  const [theme, setTheme] = useTheme()
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const cancelTimer = () => {
-    if (timer.current !== null) clearTimeout(timer.current)
-    timer.current = null
-  }
-  useEffect(
-    () => () => {
-      if (timer.current !== null) clearTimeout(timer.current)
-    },
-    [],
-  )
-  const navigate = (target: PageId) => {
-    cancelTimer()
-    setPage(target)
-    setState('empty')
+import { QuickSearch } from '@/components/quick-search'
+import { LiveWorkspace } from '@/components/live-workspace'
+import { PreferencesPanel } from '@/components/preferences-panel'
+import { useTheme, type Theme } from '@/hooks/use-theme'
+import { routeHash, useRoute } from '@/lib/routes'
+import { usePreferences, preferencesErrorMessage } from '@/lib/preferences'
+import type { PageId } from '@/preview/data'
+import { PreviewWorkspace } from '@/preview/workspace'
+
+function Shell() {
+  const route = useRoute()
+  const preferences = usePreferences(!route.preview)
+  const [previewTheme, setPreviewTheme] = useState<Theme>('system')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const snapshot = preferences.query.isError
+    ? undefined
+    : preferences.query.data
+  const theme = route.preview
+    ? previewTheme
+    : (snapshot?.preferences.theme ?? 'system')
+  useTheme(theme)
+  const navigate = (page: PageId) => {
+    window.location.hash = routeHash(page, route.preview)
     requestAnimationFrame(() => document.getElementById('page-title')?.focus())
   }
-  const scan = () => {
-    cancelTimer()
-    setState('loading')
-    timer.current = setTimeout(() => {
-      setState('ready')
-      timer.current = null
-    }, 900)
+  const saveTheme = (value: Theme) => {
+    if (route.preview) setPreviewTheme(value)
+    else if (snapshot)
+      preferences.mutation.mutate({ ...snapshot.preferences, theme: value })
   }
-  const changeState = (value: PreviewState) => {
-    cancelTimer()
-    setState(value)
+  const error = preferences.mutation.error ?? preferences.query.error
+  const reload = () => {
+    preferences.mutation.reset()
+    void preferences.query.refetch()
   }
-  const module = page !== 'overview' && page !== 'history'
   return (
     <TooltipProvider>
-      <a className="skip-link" href="#page-title">
+      <a
+        className="skip-link"
+        href="#page-title"
+        onClick={(event) => {
+          event.preventDefault()
+          document.getElementById('page-title')?.focus()
+        }}
+      >
         {ru.skip}
       </a>
       <SidebarProvider className="app-shell">
         <AppNavigation
-          page={page}
+          page={route.page}
+          preview={route.preview}
           onNavigate={navigate}
           theme={theme}
-          onThemeChange={setTheme}
+          onThemeChange={saveTheme}
+          settingsOpen={settingsOpen}
+          onSettingsOpen={setSettingsOpen}
+          onPreview={() => {
+            setPreviewTheme(theme)
+            window.location.hash = routeHash('overview', true)
+          }}
+          settingsContent={
+            route.preview ? undefined : (
+              <PreferencesPanel
+                preferences={snapshot?.preferences}
+                pending={preferences.query.isPending}
+                saving={preferences.mutation.isPending}
+                saved={preferences.mutation.isSuccess}
+                error={error}
+                onReload={reload}
+                onSave={async (value) => {
+                  await preferences.mutation.mutateAsync(value)
+                }}
+              />
+            )
+          }
         />
         <SidebarInset className="min-w-0">
           <header className="app-topbar">
             <div className="flex items-center gap-3">
               <SidebarTrigger aria-label={ru.navigation} />
-              <span className="text-xs text-muted-foreground">
-                {ru.preview}
-              </span>
-            </div>
-            <ThemeSelect theme={theme} onThemeChange={setTheme} />
-          </header>
-          <div className="preview-bar">
-            <div>
-              <FlaskConical aria-hidden="true" />
-              <strong>{ru.prototype}</strong>
-              <span>{ru.exampleData}</span>
-            </div>
-            {module && (
-              <Select
-                value={state}
-                onValueChange={(value) => {
-                  if (value in ru.states) changeState(value as PreviewState)
-                }}
-              >
-                <SelectTrigger aria-label={ru.stateLabel}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(ru.states).map(([value, label]) => (
-                    <SelectItem value={value} key={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-          <div className="workspace">
-            <div className="page-heading">
-              <h1 id="page-title" tabIndex={-1}>
-                {ru[page]}
-              </h1>
-              <p>{ru.descriptions[page]}</p>
-            </div>
-            {page === 'overview' && (
-              <OverviewScreen
+              <QuickSearch
                 onNavigate={navigate}
-                onStart={() => {
-                  navigate('cleanup')
-                  scan()
-                }}
+                onSettings={() => setSettingsOpen(true)}
               />
-            )}
-            {module && (
-              <PreviewContent
-                state={state}
-                onScan={scan}
-                onCancel={() => changeState('empty')}
+            </div>
+            <ThemeSelect
+              theme={theme}
+              onThemeChange={saveTheme}
+              disabled={
+                !route.preview && (!snapshot || preferences.mutation.isPending)
+              }
+            />
+          </header>
+          {!route.preview && preferences.mutation.isError && (
+            <div className="notice shell-error" role="alert">
+              <p>{preferencesErrorMessage(preferences.mutation.error)}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSettingsOpen(true)}
               >
-                {page === 'cleanup' && <CleanupScreen />}
-                {page === 'disks' && <DisksScreen />}
-                {page === 'startup' && <StartupScreen />}
-                {page === 'apps' && <AppsScreen />}
-              </PreviewContent>
-            )}
-            {page === 'history' && (
-              <section className="empty-state">
-                <History aria-hidden="true" />
-                <h2>{ru.historyEmpty}</h2>
-                <p>{ru.historyDescription}</p>
-              </section>
-            )}
-          </div>
+                {ru.settings}
+              </Button>
+            </div>
+          )}
+          {route.preview ? (
+            <PreviewWorkspace
+              key={route.hash}
+              page={route.page}
+              onNavigate={navigate}
+              onExit={() => {
+                window.location.hash = routeHash('overview', false)
+              }}
+            />
+          ) : (
+            <LiveWorkspace page={route.page} onNavigate={navigate} />
+          )}
           <footer className="app-status">
             <span>{ru.noChanges}</span>
+            <span>
+              {!route.preview &&
+                (preferences.mutation.isPending
+                  ? ru.settingsSaving
+                  : preferences.query.isPending
+                    ? ru.settingsLoading
+                    : error
+                      ? ru.settingsUnavailable
+                      : ru.settingsLocal)}
+            </span>
             <span>v{__APP_VERSION__}</span>
           </footer>
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>
+  )
+}
+export function App() {
+  const [client] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: false,
+            networkMode: 'always',
+            refetchOnWindowFocus: false,
+          },
+          mutations: { retry: false, networkMode: 'always' },
+        },
+      }),
+  )
+  return (
+    <QueryClientProvider client={client}>
+      <Shell />
+    </QueryClientProvider>
   )
 }

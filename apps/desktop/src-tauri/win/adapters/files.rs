@@ -39,6 +39,9 @@ impl FileSnapshot {
 #[derive(Default)]
 pub struct Exclusions(Vec<LocalPath>);
 impl Exclusions {
+    pub fn paths(&self) -> Vec<String> {
+        self.0.iter().map(|path| path.as_str().to_owned()).collect()
+    }
     pub fn add(&mut self, path: &str) -> Result<(), Denial> {
         let path = LocalPath::parse(path)?;
         if !self.0.contains(&path) {
@@ -324,4 +327,4 @@ fn last_error() -> Denial {
 
 #[cfg(test)]
 #[path = "files_tests.rs"]
-mod tests;
+pub(crate) mod tests;

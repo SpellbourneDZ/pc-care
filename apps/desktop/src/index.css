@@ -551,6 +551,55 @@
   align-items: center;
   font-size: 13px;
 }
+.quick-search-trigger kbd {
+  margin-left: 24px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.preferences-panel {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.exclusion-form {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+}
+.exclusion-form input {
+  min-width: 0;
+}
+.exclusions-scroll {
+  height: 144px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.exclusion-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.exclusion-row span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.settings-save-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.settings-save-status svg {
+  width: 16px;
+  height: 16px;
+}
+.shell-error {
+  margin: 16px 32px 0;
+}
 .app-status {
   display: flex;
   flex: 0 0 auto;

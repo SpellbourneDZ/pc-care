@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
-export type Theme = 'system' | 'light' | 'dark'
-export function useTheme() {
-  const [theme, setTheme] = useState<Theme>('system')
+import { useEffect } from 'react'
+import type { Theme } from '@/generated/Theme'
+export type { Theme } from '@/generated/Theme'
+export function useTheme(theme: Theme) {
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)')
     const apply = () =>
@@ -13,5 +13,4 @@ export function useTheme() {
     media.addEventListener('change', apply)
     return () => media.removeEventListener('change', apply)
   }, [theme])
-  return [theme, setTheme] as const
 }

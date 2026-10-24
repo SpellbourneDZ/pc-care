@@ -2,13 +2,51 @@ import { expect, test } from '@playwright/test'
 import { ru } from '../src/i18n/ru'
 import { checkPrototypeFlow, exampleState, navigate } from './ui-flow'
 
+test('live routes, history and keyboard search work without example findings', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await expect(
+    page.getByRole('heading', { name: ru.overview, level: 1 }),
+  ).toBeVisible()
+  await expect(page.getByText(ru.exampleData)).not.toBeVisible()
+  await expect(page.getByRole('button', { name: ru.findJunk })).toBeDisabled()
+  await navigate(page, ru.cleanup)
+  await navigate(page, ru.apps)
+  await page.goBack()
+  await expect(
+    page.getByRole('heading', { name: ru.cleanup, level: 1 }),
+  ).toBeVisible()
+  await page.goForward()
+  await expect(
+    page.getByRole('heading', { name: ru.apps, level: 1 }),
+  ).toBeVisible()
+  await page.keyboard.press('Control+k')
+  const search = page.getByRole('dialog', { name: ru.quickSearch })
+  await expect(search).toBeVisible()
+  await search.getByRole('combobox').fill(ru.disks)
+  await page.keyboard.press('Enter')
+  await expect(
+    page.getByRole('heading', { name: ru.disks, level: 1 }),
+  ).toBeVisible()
+  await page.keyboard.press('Control+k')
+  await page.keyboard.press('Escape')
+  await expect(
+    page.getByRole('button', { name: ru.quickSearch, exact: true }),
+  ).toBeFocused()
+  await page.goto('/#/unknown')
+  await expect(
+    page.getByRole('heading', { name: ru.overview, level: 1 }),
+  ).toBeVisible()
+})
+
 test('four prototype modules are interactive offline and fit the window', async ({
   page,
   context,
 }, testInfo) => {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto('/')
+  await page.goto('/#/preview/overview')
   await expect(page.getByRole('heading', { name: ru.emptyTitle })).toBeVisible()
   await expect(page.getByText(ru.exampleData)).toBeVisible()
   await context.setOffline(true)
@@ -24,7 +62,7 @@ test('four prototype modules are interactive offline and fit the window', async 
 test('empty, loading, error, partial, unsupported and offline states recover', async ({
   page,
 }) => {
-  await page.goto('/')
+  await page.goto('/#/preview/overview')
   for (const module of [ru.cleanup, ru.disks, ru.startup, ru.apps]) {
     await navigate(page, module)
     await expect(
@@ -55,7 +93,7 @@ test('empty, loading, error, partial, unsupported and offline states recover', a
 test('theme follows system, manual choices override it, dialogs restore focus', async ({
   page,
 }) => {
-  await page.goto('/')
+  await page.goto('/#/preview/overview')
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' })
   await expect(page.locator('html')).toHaveClass('dark')
   const theme = page.getByRole('combobox', { name: ru.theme })
