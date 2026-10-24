@@ -63,6 +63,8 @@ pnpm test:smoke
 pnpm rust:check
 pnpm build
 pnpm test:native
+pnpm build:qa
+pnpm test:settings
 ```
 
 - `build:web` проверяет TS strict и собирает frontend в `apps/desktop/dist`.
@@ -79,7 +81,7 @@ pnpm test:native
 
 Системных plugins нет; main имеет только allow-operation-api для закрытого typed IPC. Mock scan доступен в debug, release возвращает unsupported. Исполнение планов пока только симуляция, без Windows effects. Production CSP разрешает только локальные ресурсы; dev CSP отдельно допускает локальный HMR. Предварительный app identifier `local.pccare.desktop` не является утверждённым публичным именем. Контракт и генерация типов: [SPE-58 API](SPE-58-api.md).
 
-NSIS current-user намечен конфигурацией, bundling выключен. Установщик, подпись, clean Windows 10/11 VM и merge protection относятся к последующим задачам/настройке GitHub. Проверки CI видны в PR; branch protection будет настроен в SPE-60.
+Обычный build не включает bundling. `pnpm build:installer` создаёт черновой NSIS current-user, `pnpm test:installer` проверяет PE/размеры и пишет SHA256 manifest без запуска installer. WebView2 в draft не устанавливается и должен быть уже доступен. Подробности, ограничения VM и настройки branch protection — [SPE-60](SPE-60-testing.md). Подпись и полноценный release workflow — SPE-83.
 
 ## Неполадки
 
@@ -87,6 +89,7 @@ NSIS current-user намечен конфигурацией, bundling выклю
 - `link.exe not found` / отсутствуют SDK libraries: проверьте C++ workload и SDK в Visual Studio Installer; перезапустите консоль.
 - Порт 1420 занят: завершите собственный предыдущий dev-сервер; Vite намеренно не выбирает другой порт.
 - Registry timeout при shadcn: CLI использует HTTPS_PROXY/HTTP_PROXY, а не автоматически прокси Windows. При наличии системного прокси передайте его в окружении процесса. Не сохраняйте адреса/учётные данные прокси в Git.
+- Для native smoke не направляйте loopback CDP через HTTP_PROXY/HTTPS_PROXY: ограничьте proxy процессом build или добавьте `127.0.0.1,localhost` к `NO_PROXY`. Иначе соединение Playwright с локальным WebView2 может завершиться ECONNRESET.
 - Ошибка запуска WebView2: проверьте Evergreen Runtime; UI тест нельзя считать пройденным только по успешной компиляции.
 
 Лицензия MIT находится в корне репозитория; installer/release не публикуется на этапе foundation.

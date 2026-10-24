@@ -12,6 +12,8 @@
     "dev:web": "pnpm --filter @pc-care/desktop dev:web",
     "build": "pnpm --filter @pc-care/desktop build",
     "build:qa": "pnpm --filter @pc-care/desktop build:qa",
+    "build:installer": "pnpm --filter @pc-care/desktop build:installer",
+    "test:installer": "pnpm --filter @pc-care/desktop test:installer",
     "build:web": "pnpm --filter @pc-care/desktop build:web",
     "check": "pnpm --filter @pc-care/desktop check",
     "lint": "pnpm --filter @pc-care/desktop lint",

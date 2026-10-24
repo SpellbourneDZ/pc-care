@@ -28,7 +28,25 @@ jobs:
       - run: pnpm build:web
       - run: pnpm test:smoke
       - run: pnpm rust:check
-      - run: pnpm build
+      - run: pnpm build:installer
       - run: pnpm test:native
       - run: pnpm build:qa
       - run: pnpm test:settings
+      - run: pnpm test:installer
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pc-care-draft-nsis-${{ github.sha }}
+          path: |
+            target/release/bundle/nsis/*_x64-setup.exe
+            target/release/bundle/nsis/draft-manifest.json
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: pc-care-test-evidence-${{ github.sha }}
+          path: |
+            apps/desktop/test-results/**/*.png
+            apps/desktop/test-results/**/trace.zip
+          if-no-files-found: ignore
+          retention-days: 7

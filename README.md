@@ -11,6 +11,8 @@
 - [Защитная политика SPE-59 и границы допуска](docs/SPE-59-policy.md)
 - [Desktop UX, tokens и прототип SPE-56](docs/SPE-56-design-system.md)
 - [Навигация и локальные настройки SPE-57](docs/SPE-57-shell-settings.md)
+- [Windows CI / draft NSIS / VM strategy](docs/SPE-60-testing.md)
+- [Политика безопасности](SECURITY.md)
 - [План и требования в Linear](https://linear.app/splbrn/project/pc-care-windows-cleaner-open-source-887c4dc0f0c3)
 
 ```powershell
