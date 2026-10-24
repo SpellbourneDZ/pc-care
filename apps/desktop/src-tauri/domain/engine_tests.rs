@@ -383,6 +383,8 @@ fn hostile_or_unknown_ipc_fields_are_rejected() {
         r#"{"type":"start_scan","data":{"kind":"mock","scenario":"complete","timeout_ms":1000,"path":"C:\\Windows"}}"#,
         r#"{"type":"execute_plan","data":{"plan_id":"C:\\Windows","explicit_confirmation":true}}"#,
         r#"{"type":"delete_file","data":{"path":"C:\\Windows"}}"#,
+        r#"{"type":"delete_registry_key","data":{"path":"HKLM\\SOFTWARE\\OtherApp"}}"#,
+        r#"{"type":"execute_plan","data":{"plan_id":"00000000-0000-0000-0000-000000000000","explicit_confirmation":true,"path":"C:\\Windows"}}"#,
         r#"{"type":"start_scan","data":{"kind":"filesystem","scenario":"complete","timeout_ms":1000}}"#,
         r#"{"type":"start_scan","data":{"kind":"mock","scenario":"complete","timeout_ms":-1}}"#,
     ] {

@@ -106,20 +106,37 @@ test('release executable renders offline in Windows WebView2', async ({
         type: 'start_scan',
         data: { kind: 'mock', scenario: 'complete', timeout_ms: 1000 },
       })
-      let arbitraryDenied = false
-      try {
-        await call({ type: 'delete_file', data: { path: 'C:/Windows' } })
-      } catch {
-        arbitraryDenied = true
+      const denied: boolean[] = []
+      for (const request of [
+        { type: 'delete_file', data: { path: 'C:/Windows' } },
+        {
+          type: 'delete_registry_key',
+          data: { path: 'HKLM/SOFTWARE/OtherApp' },
+        },
+        {
+          type: 'execute_plan',
+          data: {
+            plan_id: '11111111-1111-4111-8111-111111111111',
+            explicit_confirmation: true,
+            path: 'C:/Windows',
+          },
+        },
+      ]) {
+        try {
+          await call(request)
+          denied.push(false)
+        } catch {
+          denied.push(true)
+        }
       }
-      return { missing, unavailable, arbitraryDenied }
+      return { missing, unavailable, denied }
     })
     expect(apiResults.missing).toEqual({ status: 'error', error: 'not_found' })
     expect(apiResults.unavailable).toEqual({
       status: 'error',
       error: 'unsupported',
     })
-    expect(apiResults.arbitraryDenied).toBe(true)
+    expect(apiResults.denied).toEqual([true, true, true])
     await page.screenshot({ path: testInfo.outputPath('webview2.png') })
   } finally {
     await browser?.close()

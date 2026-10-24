@@ -10,7 +10,7 @@
 - Порядок milestones: 00 Foundation & UX → 01 Smart Cleanup → 02 Storage Analyzer → 03 Startup Manager → 04 Apps & Uninstaller → 05 QA & Open-source Release.
 - SPE-55 — только инфраструктура и безопасный стартовый экран. Полные экраны/дизайн — SPE-56; IPC — SPE-58; защитная политика — SPE-59; расширенная Windows CI/VM стратегия — SPE-60. Не реализовывать следующие задачи внутри текущей.
 - SPE-55 разблокирует SPE-56 и SPE-58. SPE-57 зависит от обеих. Сначала зависимости, затем потребители; сверять актуальные связи в Linear.
-- SPE-55 реализована в PR #1 (Windows CI зелёный), остаётся In Review. SPE-58 развивается отдельной зависимой веткой, без автоматического слияния foundation.
+- SPE-55 и SPE-58 реализованы в PR #1/#2 (Windows CI зелёный), остаются In Review. SPE-59 — отдельная зависимая ветка поверх #2; не сливать PR автоматически.
 - Не переводить задачи в Done до приёмки владельцем. Реализация → In Review с результатами и ограничениями.
 
 ## Стек и структура
@@ -23,6 +23,7 @@
 - Cargo workspace — в корне. pnpm-lock.yaml и Cargo.lock хранить в Git; прямые версии зависимостей фиксировать. Новую зависимость добавлять только при реальной необходимости.
 - IPC SPE-58: один operation_api с закрытым ApiRequest; подробности docs/SPE-58-api.md. Rust contracts.rs — источник TS types, src/generated не редактировать вручную; pnpm types:generate и pnpm types:check. Wire snake_case, UUID строками, bytes десятичными строками.
 - Mock scan только в debug, production отвечает unsupported. execute_plan пока только simulated=true с нулём reclaimed bytes. До реальных эффектов нужны policy/revalidation (SPE-59) и durable outcome recovery (SPE-63); timeout нельзя считать гарантией неисполнения и автоматически повторять execute.
+- SPE-59: docs/SPE-59-policy.md. FilePolicy — backend-only read probe/snapshot/revalidate, не разрешение на удаление. Допуск сейчас только к обычным файлам UserTemp; остальные источники default deny. Exclusions с родительским наследованием ограничивают scope. Настройки/сохранение исключений — SPE-57; правила отбора — SPE-61; связь с реальным executor и устранение финального check/use race — SPE-63.
 - Системные операции только в Rust. UI не получает прямого доступа к файловой системе, реестру или shell. Typed IPC и минимальные capabilities, без raw arbitrary-path delete.
 - Без сетевого backend, аккаунтов, рекламы, подписок и телеметрии по умолчанию. Работать offline; не грузить шрифты/ресурсы из сети в runtime.
 - Настройки, исключения, история — локальные, с миграциями; без чувствительных данных в логах. Полное состояние задач и persistence реализовывать в соответствующих issue.
