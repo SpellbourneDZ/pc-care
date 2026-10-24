@@ -3,6 +3,7 @@ import type { CandidatePage } from "./CandidatePage";
 import type { OperationPlan } from "./OperationPlan";
 import type { OperationResult } from "./OperationResult";
 import type { ScanTaskId } from "./ScanTaskId";
+import type { SettingsSnapshot } from "./SettingsSnapshot";
 import type { TaskProgress } from "./TaskProgress";
 
-export type ApiResponse = { "type": "scan_started", "data": { task_id: ScanTaskId, } } | { "type": "task", "data": TaskProgress } | { "type": "scan_result", "data": CandidatePage } | { "type": "operation_plan", "data": OperationPlan } | { "type": "operation_result", "data": OperationResult };
+export type ApiResponse = { "type": "preferences", "data": SettingsSnapshot } | { "type": "scan_started", "data": { task_id: ScanTaskId, } } | { "type": "task", "data": TaskProgress } | { "type": "scan_result", "data": CandidatePage } | { "type": "operation_plan", "data": OperationPlan } | { "type": "operation_result", "data": OperationResult };

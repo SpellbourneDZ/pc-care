@@ -3,3 +3,5 @@
 pub mod files;
 #[cfg(windows)]
 pub mod path;
+#[cfg(windows)]
+pub mod preferences;

@@ -4,7 +4,7 @@ import { ru } from '../src/i18n/ru'
 export async function navigate(page: Page, name: string) {
   const target = page
     .getByRole('navigation', { name: ru.navigation })
-    .getByRole('button', { name, exact: true })
+    .getByRole('link', { name, exact: true })
   if (!(await target.isVisible()))
     await page.getByRole('button', { name: ru.navigation, exact: true }).click()
   await target.click()

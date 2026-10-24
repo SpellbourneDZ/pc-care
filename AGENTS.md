@@ -16,6 +16,9 @@
 
 ## Стек и структура
 
+- SPE-57: рабочие hash routes, Ctrl+K, Settings через typed IPC и TanStack Query; настройки меняются после backend acknowledgement. Прототип доступен отдельно через «О проекте», обычный запуск не использует mock scan. Контракт хранения — docs/SPE-57-shell-settings.md.
+- Дополнительная проверка настроек: pnpm build:qa и pnpm test:settings. QA EXE — только target/native-qa/release; feature qa-fixtures выключена по умолчанию, принимает только UUID fixtures внутри target/native-fixtures, не публиковать её как обычную сборку. Production native smoke не сохраняет настройки пользователя.
+
 - Windows 10/11 x64, Tauri 2, Rust stable (конкретная проверенная версия в rust-toolchain.toml), React, TypeScript strict, Vite, pnpm workspace.
 - Tailwind CSS + shadcn/ui на Radix — основная компонентная база; Lucide — иконки. Использовать официальный CLI и Vite-инструкцию https://ui.shadcn.com/docs/installation/vite.
 - apps/desktop/src/ui — локальные shadcn-компоненты. Не создавать вторую UI-библиотеку.

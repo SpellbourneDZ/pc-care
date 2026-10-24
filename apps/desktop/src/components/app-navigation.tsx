@@ -38,6 +38,10 @@ import {
   SelectValue,
 } from '@/ui/select'
 import type { Theme } from '@/hooks/use-theme'
+import type { ReactNode } from 'react'
+import { routeHash } from '@/lib/routes'
+import { DialogClose } from '@/ui/dialog'
+import { Button } from '@/ui/button'
 
 const navigation = [
   { id: 'overview', icon: House },
@@ -49,13 +53,16 @@ const navigation = [
 export function ThemeSelect({
   theme,
   onThemeChange,
+  disabled = false,
 }: {
   theme: Theme
   onThemeChange: (theme: Theme) => void
+  disabled?: boolean
 }) {
   return (
     <Select
       value={theme}
+      disabled={disabled}
       onValueChange={(value) => {
         if (value === 'system' || value === 'light' || value === 'dark')
           onThemeChange(value)
@@ -79,11 +86,21 @@ export function AppNavigation({
   onNavigate,
   theme,
   onThemeChange,
+  preview = false,
+  settingsContent,
+  settingsOpen,
+  onSettingsOpen,
+  onPreview,
 }: {
   page: PageId
   onNavigate: (page: PageId) => void
   theme: Theme
   onThemeChange: (theme: Theme) => void
+  preview?: boolean
+  settingsContent?: ReactNode
+  settingsOpen: boolean
+  onSettingsOpen: (open: boolean) => void
+  onPreview: () => void
 }) {
   const { setOpenMobile } = useSidebar()
   const navigate = (target: PageId) => {
@@ -109,10 +126,18 @@ export function AppNavigation({
                     aria-label={ru[id]}
                     isActive={page === id}
                     aria-current={page === id ? 'page' : undefined}
-                    onClick={() => navigate(id)}
+                    asChild
                   >
-                    <Icon aria-hidden="true" />
-                    <span>{ru[id]}</span>
+                    <a
+                      href={routeHash(id, preview)}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        navigate(id)
+                      }}
+                    >
+                      <Icon aria-hidden="true" />
+                      <span>{ru[id]}</span>
+                    </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -128,14 +153,22 @@ export function AppNavigation({
               aria-label={ru.history}
               isActive={page === 'history'}
               aria-current={page === 'history' ? 'page' : undefined}
-              onClick={() => navigate('history')}
+              asChild
             >
-              <History aria-hidden="true" />
-              <span>{ru.history}</span>
+              <a
+                href={routeHash('history', preview)}
+                onClick={(event) => {
+                  event.preventDefault()
+                  navigate('history')
+                }}
+              >
+                <History aria-hidden="true" />
+                <span>{ru.history}</span>
+              </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <Dialog>
+            <Dialog open={settingsOpen} onOpenChange={onSettingsOpen}>
               <DialogTrigger asChild>
                 <SidebarMenuButton
                   tooltip={ru.settings}
@@ -148,23 +181,32 @@ export function AppNavigation({
               <DialogContent className="detail-dialog">
                 <DialogHeader>
                   <DialogTitle>{ru.settings}</DialogTitle>
-                  <DialogDescription>{ru.settingsPreview}</DialogDescription>
+                  <DialogDescription>
+                    {preview ? ru.settingsPreview : ru.settingsLocal}
+                  </DialogDescription>
                 </DialogHeader>
-                <div className="settings-field">
-                  <span>{ru.theme}</span>
-                  <ThemeSelect theme={theme} onThemeChange={onThemeChange} />
-                </div>
-                <div className="settings-field">
-                  <span>{ru.language}</span>
-                  <Select value="ru" disabled>
-                    <SelectTrigger aria-label={ru.language}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ru">{ru.russian}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {settingsContent ?? (
+                  <>
+                    <div className="settings-field">
+                      <span>{ru.theme}</span>
+                      <ThemeSelect
+                        theme={theme}
+                        onThemeChange={onThemeChange}
+                      />
+                    </div>
+                    <div className="settings-field">
+                      <span>{ru.language}</span>
+                      <Select value="ru" disabled>
+                        <SelectTrigger aria-label={ru.language}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ru">{ru.russian}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
               </DialogContent>
             </Dialog>
           </SidebarMenuItem>
@@ -184,6 +226,11 @@ export function AppNavigation({
                 </DialogHeader>
                 <p className="text-sm leading-6">{ru.aboutDescription}</p>
                 <p className="supporting-text">{ru.noChanges}</p>
+                <DialogClose asChild>
+                  <Button variant="outline" onClick={onPreview}>
+                    {ru.openPrototype}
+                  </Button>
+                </DialogClose>
                 <span className="text-xs text-muted-foreground">
                   v{__APP_VERSION__}
                 </span>
