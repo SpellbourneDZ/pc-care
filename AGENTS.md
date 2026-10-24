@@ -16,6 +16,9 @@
 
 ## Стек и структура
 
+- SPE-63 в разработке: `docs/SPE-63-execution.md`, VM-kit `docs/SPE-63-vm-kit.md`. Журнал/worker пока не подключены к IPC; production cleanup execute остаётся unsupported. Dev feature `vm-recycle-probe` разрешена только для искусственных fixtures в проверенной VM, не для публикации. Проверка SMBIOS-маркера не заменяет изоляцию VM.
+- В VM подтверждены отказ COM при удерживаемом no-delete-sharing handle и staged rename по handle с сохранением file ID/sentinels → recycle. Это эксперимент, не готовый executor: нужны durable recovery mapping, policy/settings/process revalidation и полный UI/VM flow. Не включать реальные эффекты по одному факту компиляции probe.
+
 - SPE-62: docs/SPE-62-cleanup-screen.md. Рабочий UI анализа подключён; controller в Shell сохраняется при навигации. CleanupCatalog содержит rules/max_plan_items/fixture_mode. Safe выбирается по согласованному registry, Review вручную, truncated без автовыбора. Settings revision меняется → новый scan. Суммы bigint; drawer/preview по 100 файлов. Подтверждение simulated plan завершает только предпросмотр, не вызывает execute_plan; реальный result flow — SPE-63.
 - QA clock PC_CARE_FIXTURE_AGED=1 сдвигает часы анализатора на 30 дней только после проверки изолированного UUID fixture root при feature qa-fixtures. В production не читается. Весь QA UI явно помечен; pnpm test:settings включает real IPC cleanup UI smoke без изменения файлов.
 
@@ -78,6 +81,7 @@
 - Коллекция Emil: 15 навыков из [emilkowalski/skill](https://github.com/emilkowalski/skill/tree/2d228630ba1446365f614a108cb8252f1feda202/skills), включая `emil-design-eng`, `animate`, `animation-performance`, `review-animations`, `improve-animations`, `break-ui`. Локально: `C:/Users/spell/.codex/skills/<name>/SKILL.md`. Навыки Swift/Expo/mobile применять только к соответствующим задачам; стек Windows/Tauri не менять.
 - Навыки не заменяют Linear, утверждённую архитектуру и требования безопасности. Сохранять монохромную палитру, локальные ресурсы, доступность и reduced motion. Анимация не должна задерживать действия, скрывать результат операции или заменять явное подтверждение; зависимости добавлять только при необходимости. Установка навыка сама по себе не требует изменения интерфейса.
 - Владелец разрешил работать автономно в своё отсутствие. Не ждать ответа для обычных технических решений; при внешнем блокере фиксировать ограничение и продолжать независимую работу. Это не отменяет запреты на автоматическое слияние PR, Done без приёмки и небезопасные системные тесты.
+- В этом чате включено ежечасное автопродолжение `pc-care`. Оно использует текущий контекст и эти правила; не создавать дублирующие расписания. Когда вся разрешённая работа подготовлена к приёмке и доступных шагов нет, сохранить состояние и остановить автопродолжение. Не повторять неизменные блокеры и не запускать операции поверх ещё работающих сборок/VM-сценариев.
 
 - SPE-60: pnpm build:installer / pnpm test:installer собирают только unsigned draft NSIS + PE/hash smoke, не запускают installer. Для install/uninstall нужен snapshot VM; см. docs/SPE-60-testing.md и SECURITY.md. У main required windows/GitHub Actions 15368, strict/enforce admins; stacked feature branches правилом не защищены, не сливать без владельца.
 

@@ -28,6 +28,8 @@ jobs:
       - run: pnpm build:web
       - run: pnpm test:smoke
       - run: pnpm rust:check
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: cargo test --locked --example vm_safety_runner --features vm-recycle-probe
       - run: pnpm build:installer
       - run: pnpm test:native
       - run: pnpm build:qa

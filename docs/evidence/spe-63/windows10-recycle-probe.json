@@ -1,0 +1,20 @@
+[
+  {
+    "operation": {
+      "Ok": [-2144927705, false]
+    },
+    "original_exists": true,
+    "pinned": true,
+    "postdelete": [-2144927705, false],
+    "predelete": true
+  },
+  {
+    "operation": {
+      "Ok": [null, false]
+    },
+    "original_exists": false,
+    "pinned": false,
+    "postdelete": [2555912, true],
+    "predelete": true
+  }
+]

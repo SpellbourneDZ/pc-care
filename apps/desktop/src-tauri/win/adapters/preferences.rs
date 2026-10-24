@@ -123,7 +123,10 @@ impl SettingsStore {
     }
 }
 
-fn directory_guard(root: &std::path::Path, create: bool) -> Result<Option<Vec<File>>, ApiError> {
+pub(super) fn directory_guard(
+    root: &std::path::Path,
+    create: bool,
+) -> Result<Option<Vec<File>>, ApiError> {
     let path = LocalPath::parse(root.to_str().ok_or(ApiError::SettingsUnavailable)?)
         .map_err(|_| ApiError::SettingsUnavailable)?;
     if path.is_root() {
@@ -169,7 +172,7 @@ fn directory_guard(root: &std::path::Path, create: bool) -> Result<Option<Vec<Fi
     Ok(Some(handles))
 }
 
-fn check_file(file: &File) -> Result<(), ApiError> {
+pub(super) fn check_file(file: &File) -> Result<(), ApiError> {
     let metadata = file.metadata().map_err(|_| ApiError::SettingsUnavailable)?;
     if !metadata.is_file()
         || metadata.file_attributes()

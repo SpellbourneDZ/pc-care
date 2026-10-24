@@ -1,0 +1,41 @@
+[
+  {
+    "case": "pinned",
+    "collision_preserved": null,
+    "operation": {
+      "Ok": [-2144927705, false]
+    },
+    "original_exists": true,
+    "pinned": true,
+    "postdelete": [-2144927705, false],
+    "predelete": true,
+    "replacement_untouched": null,
+    "staged_identity_preserved": null
+  },
+  {
+    "case": "released",
+    "collision_preserved": null,
+    "operation": {
+      "Ok": [null, false]
+    },
+    "original_exists": false,
+    "pinned": false,
+    "postdelete": [2555912, true],
+    "predelete": true,
+    "replacement_untouched": null,
+    "staged_identity_preserved": null
+  },
+  {
+    "case": "staged",
+    "collision_preserved": true,
+    "operation": {
+      "Ok": [null, false]
+    },
+    "original_exists": false,
+    "pinned": false,
+    "postdelete": [2555912, true],
+    "predelete": true,
+    "replacement_untouched": true,
+    "staged_identity_preserved": true
+  }
+]
