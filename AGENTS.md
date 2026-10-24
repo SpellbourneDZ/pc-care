@@ -63,6 +63,8 @@
 
 ## Работа и проверки
 
+- SPE-60: pnpm build:installer / pnpm test:installer собирают только unsigned draft NSIS + PE/hash smoke, не запускают installer. Для install/uninstall нужен snapshot VM; см. docs/SPE-60-testing.md и SECURITY.md. У main required windows/GitHub Actions 15368, strict/enforce admins; stacked feature branches правилом не защищены, не сливать без владельца.
+
 1. Прочитать Linear, затронутый код/всех callers и локальные AGENTS; описать небольшой план и риски.
 2. Работать в отдельной ветке codex/<issue>-<scope>. Маленький полный diff, без ненужных абстракций/рефакторинга.
 3. Реализация, обработка ошибок, релевантные unit/integration/smoke тесты, документация; screenshots для UI.
