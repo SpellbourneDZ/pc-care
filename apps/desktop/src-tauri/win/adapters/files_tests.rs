@@ -212,6 +212,56 @@ fn real_windows_metadata_identity_and_selected_id_are_revalidated() {
     }
 }
 
+fn modification_handle(path: &Path, access: u32) -> std::io::Result<fs::File> {
+    fs::OpenOptions::new()
+        .access_mode(access)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)
+}
+
+#[test]
+fn reservation_keeps_leaf_and_ancestors_pinned_until_drop() {
+    let f = Fixture::new();
+    let path = f.file("reserved/nested/данные.tmp");
+    let snapshot = f.snapshot(&path).unwrap();
+    let reservation = f.policy.reserve(snapshot.id, &snapshot).unwrap();
+    let ancestors: Vec<_> = path
+        .ancestors()
+        .take_while(|p| p.starts_with(&f.root))
+        .collect();
+    for ancestor in &ancestors {
+        let error = modification_handle(ancestor, DELETE).unwrap_err();
+        assert_eq!(error.raw_os_error(), Some(ERROR_SHARING_VIOLATION as i32));
+    }
+    let error = modification_handle(&path, FILE_WRITE_DATA).unwrap_err();
+    assert_eq!(error.raw_os_error(), Some(ERROR_SHARING_VIOLATION as i32));
+    assert_eq!(fs::read(&path).unwrap(), b"artificial PC Care fixture");
+    drop(reservation);
+    for ancestor in ancestors {
+        drop(modification_handle(ancestor, DELETE).unwrap());
+    }
+    drop(modification_handle(&path, FILE_WRITE_DATA).unwrap());
+    assert_eq!(f.snapshot(&path).unwrap().metadata, snapshot.metadata);
+}
+
+#[test]
+fn failed_reservation_releases_all_handles() {
+    let f = Fixture::new();
+    let path = f.file("failed-reservation/nested/file.tmp");
+    let mut snapshot = f.snapshot(&path).unwrap();
+    snapshot.metadata.size += 1;
+    denied(
+        f.policy.reserve(snapshot.id, &snapshot),
+        Denial::TargetChanged,
+    );
+    for ancestor in path.ancestors().take_while(|p| p.starts_with(&f.root)) {
+        drop(modification_handle(ancestor, DELETE).unwrap());
+    }
+    drop(modification_handle(&path, FILE_WRITE_DATA).unwrap());
+    assert_eq!(fs::read(path).unwrap(), b"artificial PC Care fixture");
+}
+
 #[test]
 fn windows_hardlinks_locks_directories_and_missing_files_fail_closed() {
     let f = Fixture::new();

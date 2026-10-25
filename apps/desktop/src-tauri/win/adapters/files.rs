@@ -24,11 +24,33 @@ pub struct FileSnapshot {
     metadata: FileMetadata,
 }
 impl FileSnapshot {
+    pub(super) fn id(&self) -> CandidateId {
+        self.id
+    }
+    pub(super) fn source(&self) -> FileSource {
+        self.source
+    }
     pub fn metadata(&self) -> &FileMetadata {
         &self.metadata
     }
     pub fn path(&self) -> &str {
         self.path.as_str()
+    }
+}
+
+/// Pins the checked path without write/delete sharing; not a mutation capability.
+#[must_use = "keep the reservation alive until the checked file is no longer needed"]
+pub struct FileReservation<'a> {
+    snapshot: &'a FileSnapshot,
+    source_root: LocalPath,
+    _handles: Vec<OwnedHandle>,
+}
+impl FileReservation<'_> {
+    pub(super) fn snapshot(&self) -> &FileSnapshot {
+        self.snapshot
+    }
+    pub(super) fn source_root(&self) -> &LocalPath {
+        &self.source_root
     }
 }
 
@@ -187,17 +209,29 @@ impl FilePolicy {
         })
     }
     pub fn revalidate(&self, selected: CandidateId, snapshot: &FileSnapshot) -> Result<(), Denial> {
+        self.reserve(selected, snapshot).map(drop)
+    }
+    pub fn reserve<'a>(
+        &self,
+        selected: CandidateId,
+        snapshot: &'a FileSnapshot,
+    ) -> Result<FileReservation<'a>, Denial> {
         if selected != snapshot.id {
             return Err(Denial::ForeignId);
         }
         self.check_path(snapshot.source, &snapshot.path)?;
-        let current = observe(&snapshot.path, &self.root(snapshot.source)?)?;
+        let source_root = self.root(snapshot.source)?;
+        let current = observe(&snapshot.path, &source_root)?;
         self.check_path(snapshot.source, &current.path)?;
         if snapshot.path != current.path {
             return Err(Denial::TargetChanged);
         }
-        check_identity(selected, snapshot.id, &snapshot.metadata, &current.metadata)
-        // shortcut: dry-run only; the SPE-63 mutator must close the final check/use race.
+        check_identity(selected, snapshot.id, &snapshot.metadata, &current.metadata)?;
+        Ok(FileReservation {
+            snapshot,
+            source_root,
+            _handles: current._handles,
+        })
     }
 }
 
@@ -232,6 +266,7 @@ fn known_folder(id: &GUID) -> Result<LocalPath, Denial> {
 struct Observed {
     path: LocalPath,
     metadata: FileMetadata,
+    _handles: Vec<OwnedHandle>,
 }
 
 pub(crate) struct DirectoryProbe {
@@ -291,6 +326,7 @@ fn observe(path: &LocalPath, root: &LocalPath) -> Result<Observed, Denial> {
             attributes: basic.FileAttributes,
             links: standard.NumberOfLinks,
         },
+        _handles: handles,
     })
 }
 
@@ -398,16 +434,15 @@ fn open_path(path: &LocalPath, directory: bool) -> Result<Vec<OwnedHandle>, Deni
         let leaf = index + 1 == prefixes.len();
         let wide = prefix.wide();
         // OPEN_EXISTING never creates/truncates. DELETE requests an ACL check, not a mutation.
+        // Ancestors need LIST_DIRECTORY: attribute-only handles do not enforce share denial.
         let raw = unsafe {
             CreateFileW(
                 wide.as_ptr(),
                 FILE_READ_ATTRIBUTES
                     | if leaf && !directory {
                         DELETE
-                    } else if leaf {
-                        FILE_LIST_DIRECTORY
                     } else {
-                        0
+                        FILE_LIST_DIRECTORY
                     },
                 FILE_SHARE_READ,
                 ptr::null(),

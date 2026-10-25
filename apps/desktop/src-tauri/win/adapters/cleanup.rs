@@ -156,9 +156,10 @@ impl CleanupScanner {
             return issue(sink, rule, Some(path.as_str()), Denial::UnverifiedType);
         }
         sink(ScanEvent::Checkpoint)?;
-        if let Err(reason) = self.policy.revalidate(id, &snapshot) {
-            return issue(sink, rule, Some(path.as_str()), reason);
-        }
+        let _reservation = match self.policy.reserve(id, &snapshot) {
+            Ok(reservation) => reservation,
+            Err(reason) => return issue(sink, rule, Some(path.as_str()), reason),
+        };
         let descriptor = rule.descriptor();
         sink(ScanEvent::Candidate(Candidate {
             id,

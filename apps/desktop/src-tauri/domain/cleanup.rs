@@ -13,29 +13,36 @@ pub enum RuleId {
 
 impl RuleId {
     pub const ALL: [Self; 3] = [Self::UserTemp, Self::ChromeHttpCache, Self::EdgeHttpCache];
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::UserTemp => "user-temp-v1",
+            Self::ChromeHttpCache => "chrome-http-cache-v1",
+            Self::EdgeHttpCache => "edge-http-cache-v1",
+        }
+    }
+    pub fn from_key(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|rule| rule.key() == key)
+    }
     pub fn descriptor(self) -> CleanupRule {
-        let (id, name, description, safety) = match self {
+        let (name, description, safety) = match self {
             Self::UserTemp => (
-                "user-temp-v1",
                 "Временные файлы пользователя",
                 "Только обычные .tmp/.temp файлы в пользовательском Temp, не изменявшиеся минимум 7 дней. Используемые, защищённые и исключённые объекты, данные браузеров и другие форматы пропускаются.",
                 SafetyClass::Safe,
             ),
             Self::ChromeHttpCache => (
-                "chrome-http-cache-v1",
                 "HTTP-кеш Google Chrome",
                 "Только Cache стандартного профиля, при закрытом Chrome. Ресурсы потребуется загрузить заново; офлайн-копии могут стать недоступны. Cookies, пароли и сессии не входят.",
                 SafetyClass::Review,
             ),
             Self::EdgeHttpCache => (
-                "edge-http-cache-v1",
                 "HTTP-кеш Microsoft Edge",
                 "Только Cache стандартного профиля, при закрытом Edge. Ресурсы потребуется загрузить заново; офлайн-копии могут стать недоступны. Cookies, пароли и сессии не входят.",
                 SafetyClass::Review,
             ),
         };
         CleanupRule {
-            id: id.into(),
+            id: self.key().into(),
             name: name.into(),
             description: description.into(),
             safety,

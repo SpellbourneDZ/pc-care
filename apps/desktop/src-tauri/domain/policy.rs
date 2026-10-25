@@ -27,13 +27,15 @@ pub enum Denial {
     UnverifiedType,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FileIdentity {
     pub volume: u64,
     pub id: [u8; 16],
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FileMetadata {
     pub identity: FileIdentity,
     pub size: u64,

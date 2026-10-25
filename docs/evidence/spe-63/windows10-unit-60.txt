@@ -1,0 +1,68 @@
+
+running 60 tests
+test api::tests::cleanup_catalog_reports_preview_boundary_and_build_provenance ... ok
+test api::tests::dispatch_serialization_channels_and_plan_roundtrip ... ok
+test domain::bindings::tests::typescript_bindings_match_rust_contracts ... ok
+test domain::cleanup::tests::registry_is_closed_and_all_three_timestamps_must_be_old ... ok
+test domain::engine::tests::cancellation_before_worker_starts_emits_terminal_once ... ok
+test domain::engine::tests::cancellation_emits_terminal_state_without_publishing_snapshot ... ok
+test domain::engine::tests::cancelled_worker_keeps_its_slot_until_terminal_delivery ... ok
+test domain::engine::tests::expired_plan_and_concurrent_replay_are_rejected ... ok
+test domain::engine::tests::foreign_scan_ids_and_changed_identity_cannot_execute ... ok
+test domain::engine::tests::hostile_or_unknown_ipc_fields_are_rejected ... ok
+test domain::engine::tests::native_candidate_limit_publishes_an_explicitly_truncated_snapshot ... ok
+test domain::engine::tests::native_workers_group_partial_reasons_and_cannot_execute_real_candidates ... ok
+test domain::engine::tests::only_one_cleanup_worker_can_run_even_after_cancellation_until_exit ... ok
+test domain::engine::tests::plans_require_owned_ids_selection_confirmation_and_single_use ... ok
+test domain::engine::tests::production_disables_mock_and_limits_are_validated ... ok
+test domain::engine::tests::scan_progress_pagination_and_identity_are_consistent ... ok
+test domain::engine::tests::snapshot_string_budget_is_bounded_and_reported ... ok
+test domain::engine::tests::task_and_plan_retention_are_bounded ... ok
+test domain::engine::tests::timeout_adapter_failure_and_disconnection_are_visible ... ok
+test domain::execution::tests::contradictory_durable_outcomes_are_rejected ... ok
+test domain::execution::tests::dry_run_never_calls_effects_and_per_item_failures_remain_distinct ... ok
+test domain::execution::tests::failed_journal_write_stops_effects_and_recovery_never_replays_started_items ... ok
+test domain::execution::tests::intent_precedes_each_effect_and_cancel_preserves_acknowledged_results ... ok
+test domain::execution::tests::unknown_outcome_stops_the_batch_and_invalid_targets_never_reach_effects ... ok
+test win::adapters::cleanup::tests::browser_marker_added_after_snapshot_revokes_scope ... ok
+test win::adapters::cleanup::tests::changed_target_before_publication_is_skipped ... ok
+test win::adapters::cleanup::tests::compressed_allocation_is_distinct_from_logical_size ... ok
+test win::adapters::cleanup::tests::directory_probe_pins_ancestors_without_blocking_child_file_creation ... ok
+test win::adapters::cleanup::tests::failed_process_probe_closes_both_caches_without_losing_temp_results ... ok
+test win::adapters::cleanup::tests::locked_acl_hardlink_and_actual_junctions_are_visible_without_following_them ... ok
+test win::adapters::cleanup::tests::portable_browser_profiles_sensitive_sidecars_and_unverified_temp_types_stay_protected ... ok
+test win::adapters::cleanup::tests::recent_excluded_running_and_browser_state_are_not_candidates ... ok
+test win::adapters::cleanup::tests::three_allowlisted_sources_report_allocation_and_leave_bytes_unchanged ... ok
+test win::adapters::execution::tests::acknowledgement_cancel_and_replay_do_not_repeat_effects ... ok
+test win::adapters::execution::tests::adapter_panic_recovers_unknown_without_keeping_the_worker_slot ... ok
+test win::adapters::execution_journal::tests::exclusive_lease_atomic_updates_and_restart_recovery_preserve_unknown_outcomes ... ok
+test win::adapters::execution_journal::tests::failed_replacement_preserves_durable_intent ... ok
+test win::adapters::execution_journal::tests::journal_child_process ... ok
+test win::adapters::execution_journal::tests::malformed_future_locked_hardlinked_and_redirected_ledgers_fail_closed ... ok
+test win::adapters::execution_journal::tests::process_exit_releases_lease_and_durable_intent_is_never_replayed ...
+running 1 test
+test win::adapters::execution_journal::tests::journal_child_process ...
+running 1 test
+test win::adapters::execution_journal::tests::journal_child_process ... ok
+test win::adapters::files::tests::actual_junctions_and_loops_are_rejected_before_following_children ... ok
+test win::adapters::files::tests::all_protected_and_unknown_scope_fixtures_are_denied ... ok
+test win::adapters::files::tests::cloud_reparse_and_unsupported_attributes_never_pass ... ok
+test win::adapters::files::tests::current_user_scope_comes_from_known_folders_without_reading_user_files ... ok
+test win::adapters::files::tests::parent_exclusions_are_case_insensitive_and_rechecked_after_snapshot ... ok
+test win::adapters::files::tests::paths_reject_namespaces_traversal_streams_and_ambiguous_names ... ok
+test win::adapters::files::tests::real_windows_metadata_identity_and_selected_id_are_revalidated ... ok
+test win::adapters::files::tests::redirected_user_documents_stay_protected_even_inside_temp ... ok
+test win::adapters::files::tests::windows_acl_denial_is_visible_and_never_elevated ... ok
+test win::adapters::files::tests::windows_hardlinks_locks_directories_and_missing_files_fail_closed ... ok
+test win::adapters::files::tests::windows_long_paths_remain_local_and_revalidate ... ok
+test win::adapters::preferences::tests::config_reparse_and_hardlink_targets_cannot_redirect_storage ... ok
+test win::adapters::preferences::tests::defaults_read_without_creating_config_and_preferences_survive_restart ... ok
+test win::adapters::preferences::tests::failed_atomic_replace_preserves_the_previous_settings ... ok
+test win::adapters::preferences::tests::invalid_exclusions_and_oversized_files_fail_closed ... ok
+test win::adapters::preferences::tests::legacy_migrates_in_memory_and_only_explicit_save_replaces_it ... ok
+test win::adapters::preferences::tests::locked_store_and_unavailable_storage_are_visible ... ok
+test win::adapters::preferences::tests::malformed_or_future_settings_are_not_reset_or_overwritten ... ok
+test win::adapters::preferences::tests::stale_revision_and_concurrent_saves_do_not_lose_updates ... ok
+test win::adapters::preferences::tests::unknown_preferences_ipc_fields_and_language_are_rejected ... ok
+
+test result: ok. 60 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.48s
