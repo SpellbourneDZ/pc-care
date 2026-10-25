@@ -51,7 +51,7 @@ impl Exclusions {
         self.0.retain(|p| p != &path);
         Ok(())
     }
-    fn contains(&self, path: &LocalPath) -> bool {
+    pub(super) fn contains(&self, path: &LocalPath) -> bool {
         self.0.iter().any(|p| path.within(p))
     }
 }
@@ -452,7 +452,7 @@ fn open_path(path: &LocalPath, directory: bool) -> Result<Vec<OwnedHandle>, Deni
     Ok(handles)
 }
 
-fn check_attributes(attributes: u32, leaf: bool) -> Result<(), Denial> {
+pub(super) fn check_attributes(attributes: u32, leaf: bool) -> Result<(), Denial> {
     if attributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
         return Err(Denial::ReparsePoint);
     }
@@ -480,7 +480,10 @@ fn check_attributes(attributes: u32, leaf: bool) -> Result<(), Denial> {
     Ok(())
 }
 
-fn info<T: Default>(handle: &OwnedHandle, class: FILE_INFO_BY_HANDLE_CLASS) -> Result<T, Denial> {
+pub(super) fn info<T: Default>(
+    handle: &OwnedHandle,
+    class: FILE_INFO_BY_HANDLE_CLASS,
+) -> Result<T, Denial> {
     let mut value = T::default();
     // T and its information class are paired at the private call sites above.
     if unsafe {
@@ -496,7 +499,7 @@ fn info<T: Default>(handle: &OwnedHandle, class: FILE_INFO_BY_HANDLE_CLASS) -> R
     }
     Ok(value)
 }
-fn final_path(handle: &OwnedHandle) -> Result<LocalPath, Denial> {
+pub(super) fn final_path(handle: &OwnedHandle) -> Result<LocalPath, Denial> {
     let mut buffer = vec![0u16; 32_768];
     let len = unsafe {
         GetFinalPathNameByHandleW(

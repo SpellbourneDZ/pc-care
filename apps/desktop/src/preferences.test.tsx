@@ -37,7 +37,7 @@ test('closed routes fall back safely and live shell never starts a mock scan', a
   })
   const user = userEvent.setup()
   render(<App />)
-  await waitFor(() => expect(api).toHaveBeenCalledTimes(2))
+  await waitFor(() => expect(api).toHaveBeenCalledTimes(3))
   expect(screen.queryByText(ru.exampleData)).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: ru.findJunk })).toBeDisabled()
   await user.click(screen.getByRole('link', { name: ru.apps }))
@@ -46,7 +46,9 @@ test('closed routes fall back safely and live shell never starts a mock scan', a
   ).toBeVisible()
   expect(
     api.mock.calls.every(([request]) =>
-      ['get_preferences', 'get_cleanup_rules'].includes(request.type),
+      ['get_preferences', 'get_cleanup_rules', 'list_volumes'].includes(
+        request.type,
+      ),
     ),
   ).toBe(true)
 })
@@ -111,7 +113,7 @@ test('storage failure and conflict stay visible without automatic retry', async 
     ru.settingsInvalid,
   )
   expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument()
-  expect(api).toHaveBeenCalledTimes(2)
+  expect(api).toHaveBeenCalledTimes(3)
   await user.click(
     within(dialog).getByRole('button', { name: ru.reloadSettings }),
   )
@@ -123,5 +125,5 @@ test('storage failure and conflict stay visible without automatic retry', async 
     ru.settingsConflict,
   )
   expect(document.documentElement).not.toHaveClass('dark')
-  expect(api).toHaveBeenCalledTimes(4)
+  expect(api).toHaveBeenCalledTimes(5)
 })

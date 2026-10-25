@@ -1,3 +1,4 @@
+pub use super::storage::{StorageNode, StoragePage, StorageQuery, VolumeInfo};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use uuid::Uuid;
@@ -91,6 +92,7 @@ pub enum SafetyClass {
 pub enum ScanKind {
     Mock,
     Cleanup,
+    Storage,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -266,6 +268,19 @@ pub struct StartScanRequest {
     deny_unknown_fields
 )]
 pub enum ApiRequest {
+    ListVolumes,
+    OpenStorageLocation {
+        scan_id: ScanId,
+        node_id: u32,
+    },
+    StartStorageScan {
+        path: String,
+        timeout_ms: u32,
+    },
+    GetStoragePage {
+        scan_id: ScanId,
+        query: StorageQuery,
+    },
     GetCleanupRules,
     GetPreferences,
     SavePreferences {
@@ -302,6 +317,9 @@ pub enum ApiRequest {
     deny_unknown_fields
 )]
 pub enum ApiResponse {
+    Volumes(Vec<VolumeInfo>),
+    StorageLocationOpened { node_id: u32 },
+    StoragePage(Box<StoragePage>),
     CleanupRules(CleanupCatalog),
     Preferences(SettingsSnapshot),
     ScanStarted { task_id: ScanTaskId },

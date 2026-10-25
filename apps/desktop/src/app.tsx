@@ -10,6 +10,7 @@ import { LiveWorkspace } from '@/components/live-workspace'
 import { PreferencesPanel } from '@/components/preferences-panel'
 import { useTheme, type Theme } from '@/hooks/use-theme'
 import { useCleanup } from '@/hooks/use-cleanup'
+import { useStorage } from '@/hooks/use-storage'
 import { routeHash, useRoute } from '@/lib/routes'
 import { usePreferences, preferencesErrorMessage } from '@/lib/preferences'
 import type { PageId } from '@/preview/data'
@@ -28,6 +29,7 @@ function Shell() {
     snapshot?.revision,
     preferences.query.error,
   )
+  const storage = useStorage(!route.preview, snapshot?.revision)
   const theme = route.preview
     ? previewTheme
     : (snapshot?.preferences.theme ?? 'system')
@@ -130,6 +132,7 @@ function Shell() {
               page={route.page}
               onNavigate={navigate}
               cleanup={cleanup}
+              storage={storage}
             />
           )}
           <footer className="app-status">

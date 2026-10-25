@@ -3,7 +3,11 @@ import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: './tests',
   outputDir: './test-results/browser',
-  testMatch: ['browser.spec.ts', 'cleanup-browser.spec.ts'],
+  testMatch: [
+    'browser.spec.ts',
+    'cleanup-browser.spec.ts',
+    'storage-browser.spec.ts',
+  ],
   forbidOnly: !!process.env.CI,
   workers: 2,
   use: {
