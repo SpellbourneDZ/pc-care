@@ -50,7 +50,7 @@ Production/QA build и 2 production + 5 QA native tests прошли. После
 
 Этап MSI check: прошли 71 Rust test, 33 frontend tests, полный прогон 65 browser-сценариев, typecheck/lint/format/bindings, default/all-features clippy, production/QA build и все 7 native tests. Native QA проверяет, что искусственный MSI даёт msi_matched, но не включает удаление. Реальная read-only калибровка через Windows Installer API проверила 8 подходящих регистраций: 7 совпадений, 1 неположительный результат. В выводе только счётчики, без имён, GUID и путей. Это не uninstall/VM proof. Первый этап `b59c87c` прошёл полный hosted Windows CI [40177592297](https://github.com/SpellbourneDZ/pc-care/actions/runs/40177592297); свежий этап запускает новый CI после push.
 
-`pnpm build` создаёт обычный `target/release/pc-care.exe`. Локальная копия этапа для владельца — `target/apps-preview/pc-care.exe`, рядом manifest и инструкция. Ранее сохранённые SPE-64/65/70 пакеты не меняются. Ничего не слито, Done/релиз не публикуются автоматически.
+`pnpm build` создаёт обычный `target/release/pc-care.exe`. Локальная копия с MSI check — `target/apps-msi-preview/pc-care.exe`, рядом manifest и инструкция. Первый этап остаётся в `target/apps-preview`; его manifest/архив b59c87c не подменяются новой сборкой. Ранее сохранённые SPE-64/65/70 пакеты тоже не меняются. Ничего не слито, Done/релиз не публикуются автоматически.
 
 ## Скриншоты
 
