@@ -201,7 +201,7 @@ impl FilePolicy {
     }
 }
 
-fn known_folder(id: &GUID) -> Result<LocalPath, Denial> {
+pub(super) fn known_folder(id: &GUID) -> Result<LocalPath, Denial> {
     let mut raw = ptr::null_mut();
     // Shell allocates a NUL-terminated string; always release it with the matching allocator.
     let hr =

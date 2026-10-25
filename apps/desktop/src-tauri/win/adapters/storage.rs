@@ -394,6 +394,38 @@ pub fn show_location(node: &StorageNode, exclusions: &[String]) -> Result<(), Ap
     result
 }
 
+pub(super) struct ReadOnlyDirectory {
+    _guards: Vec<Probe>,
+    entries: ReadDir,
+}
+impl Iterator for ReadOnlyDirectory {
+    type Item = std::io::Result<fs::DirEntry>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.entries.next()
+    }
+}
+pub(super) fn readonly_directory(path: &LocalPath) -> Result<ReadOnlyDirectory, Denial> {
+    let guards = path
+        .prefixes()
+        .iter()
+        .map(|p| probe(p, true))
+        .collect::<Result<Vec<_>, _>>()?;
+    let entries = fs::read_dir(path.wide_path()).map_err(files::denial_from_io)?;
+    Ok(ReadOnlyDirectory {
+        _guards: guards,
+        entries,
+    })
+}
+pub(super) fn metadata_node(path: &LocalPath) -> Result<StorageNode, Denial> {
+    let guard = probe(path, false)?;
+    let mut item = node(0, None, path, false);
+    item.identity = Some(guard.identity);
+    item.bytes = ByteCount(guard.allocated);
+    item.logical_bytes = ByteCount(guard.logical);
+    item.modified_ms = guard.modified_ms;
+    Ok(item)
+}
+
 #[cfg(test)]
 #[path = "storage_tests.rs"]
 mod tests;

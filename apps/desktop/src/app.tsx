@@ -11,6 +11,7 @@ import { PreferencesPanel } from '@/components/preferences-panel'
 import { useTheme, type Theme } from '@/hooks/use-theme'
 import { useCleanup } from '@/hooks/use-cleanup'
 import { useStorage } from '@/hooks/use-storage'
+import { useStartup } from '@/hooks/use-startup'
 import { routeHash, useRoute } from '@/lib/routes'
 import { usePreferences, preferencesErrorMessage } from '@/lib/preferences'
 import type { PageId } from '@/preview/data'
@@ -30,6 +31,11 @@ function Shell() {
     preferences.query.error,
   )
   const storage = useStorage(!route.preview, snapshot?.revision)
+  const startup = useStartup(
+    !route.preview && route.page === 'startup',
+    snapshot?.revision,
+    preferences.query.error,
+  )
   const theme = route.preview
     ? previewTheme
     : (snapshot?.preferences.theme ?? 'system')
@@ -133,6 +139,7 @@ function Shell() {
               onNavigate={navigate}
               cleanup={cleanup}
               storage={storage}
+              startup={startup}
             />
           )}
           <footer className="app-status">

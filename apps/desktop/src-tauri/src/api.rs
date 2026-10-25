@@ -32,6 +32,23 @@ fn dispatch(
     progress: Channel<TaskProgress>,
 ) -> Result<ApiResponse, ApiError> {
     Ok(match request {
+        ApiRequest::RefreshStartup => ApiResponse::StartupCatalog(engine.publish_startup(
+            crate::win::adapters::startup::collect(&settings.load()?.preferences.exclusions)?,
+        )?),
+        ApiRequest::GetStartupPage { snapshot_id, query } => {
+            ApiResponse::StartupPage(engine.startup_page(snapshot_id, query)?)
+        }
+        ApiRequest::OpenStartupLocation {
+            snapshot_id,
+            entry_id,
+        } => {
+            let location = engine.startup_location(snapshot_id, entry_id)?;
+            crate::win::adapters::storage::show_location(
+                &location,
+                &settings.load()?.preferences.exclusions,
+            )?;
+            ApiResponse::StorageLocationOpened { node_id: entry_id }
+        }
         ApiRequest::ListVolumes => {
             let mut volumes = crate::win::adapters::storage::volumes()?;
             for volume in &mut volumes {
