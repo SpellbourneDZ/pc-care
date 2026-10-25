@@ -25,6 +25,7 @@ jobs:
       - run: pnpm check
       - run: pnpm lint
       - run: pnpm test
+      - run: pnpm test:uninstall-fixture
       - run: pnpm build:web
       - run: pnpm test:smoke
       - run: pnpm rust:check

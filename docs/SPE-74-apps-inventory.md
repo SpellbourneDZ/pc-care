@@ -52,6 +52,10 @@ WinVerifyTrust получает удерживаемый file handle, не за�
 
 Скан связанных файлов/ключей, evidence/confidence, защита shared data, ручной выбор, registry backup/проверка, индивидуальные результаты, отмена, история и экспорт результата ещё не реализованы. Кнопка «Найти остатки» недоступна с пояснением. Не выполняется поиск по одной подстроке имени. Системный gate SPE-63 не включался.
 
+Подготовлен [MSI fixture kit](SPE-74-vm-fixtures.md): генерация двух одинаково названных per-user продуктов с разными GUID/UUID, проверка базы/хешей без установки и VM test plan. Это готовые искусственные входные данные, не доказанная installation/uninstall реализация. Fixture packages и Windows system binary copies из signature tests не публикуются.
+
+Локальный integration test builder прошёл: созданы и повторно прочитаны два MSI, проверены hashes и отсутствие регистрации продуктов на хосте. Тест добавлен в Windows CI. Runtime после `3509ad5` не менялся; полный hosted CI этого этапа [40186120921](https://github.com/SpellbourneDZ/pc-care/actions/runs/40186120921) прошёл.
+
 ## Проверка и запуск
 
 На Windows 11 x64 прошли typecheck/lint/format/bindings, 31 frontend test и 66 Rust tests, fmt/clippy (включая all-features). Пройдены 50 существующих browser-сценариев и 10 новых во всех пяти проектах; новые сценарии повторно прошли после исправления выбора fixture mode через URL. В полном первом прогоне 5 тестов состояний не прошли из-за неопределённого порядка накопленных init scripts; исправление проверено всеми 10 Apps-сценариями. Hosted CI запускается отдельно после создания PR.

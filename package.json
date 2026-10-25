@@ -14,6 +14,8 @@
     "build:qa": "pnpm --filter @pc-care/desktop build:qa",
     "build:installer": "pnpm --filter @pc-care/desktop build:installer",
     "test:installer": "pnpm --filter @pc-care/desktop test:installer",
+    "build:uninstall-fixture": "pnpm --filter @pc-care/desktop build:uninstall-fixture",
+    "test:uninstall-fixture": "pnpm --filter @pc-care/desktop test:uninstall-fixture",
     "build:web": "pnpm --filter @pc-care/desktop build:web",
     "check": "pnpm --filter @pc-care/desktop check",
     "lint": "pnpm --filter @pc-care/desktop lint",

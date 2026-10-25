@@ -10,6 +10,8 @@
     "build:qa": "node scripts/build-qa.mjs",
     "build:installer": "tauri build --config src-tauri/tauri.ci.conf.json --bundles nsis --ci",
     "test:installer": "node --test scripts/check-installer.test.mjs && node scripts/check-installer.mjs",
+    "build:uninstall-fixture": "powershell.exe -NoProfile -NonInteractive -File scripts/build-uninstall-fixture.ps1",
+    "test:uninstall-fixture": "node --test scripts/uninstall-fixture.test.mjs",
     "build:web": "tsc --noEmit && vite build",
     "check": "tsc --noEmit",
     "lint": "eslint .",
