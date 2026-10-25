@@ -28,4 +28,4 @@
 
 Карта содержит приватный путь и metadata, хранится отдельно от pathless result JSON и не является разрешением на restore/delete. Шифрование, явная DACL staging namespace и защита от процесса с полным доступом той же учётной записи не заявляются.
 
-Последняя VM evidence относится к 64 тестам. Новые 8 recovery tests пока проверены только на хосте. Перенос по handle, проверка тома/identity назначения, актуальная policy/settings/process revalidation, recovery UI, полная COM-цепочка и потеря питания ещё не проверены этой реализацией.
+После host-прогона все 72 tests, включая новые 8 recovery tests, прошли на новом offline Windows VM overlay за 60.12 s: [отчёт](windows10-unit-72.txt), [manifest](payload-unit72-v7.manifest.json). Полный [Windows CI code head 2f90f71](https://github.com/SpellbourneDZ/pc-care/actions/runs/40150227422) также прошёл. Перенос по handle, проверка тома/identity назначения, актуальная policy/settings/process revalidation, recovery UI, полная COM-цепочка и потеря питания ещё не проверены этой реализацией.

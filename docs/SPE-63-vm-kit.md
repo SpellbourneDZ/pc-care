@@ -54,3 +54,11 @@ GUI-обработчик выбирает ровно один из двух ре
 Использован новый overlay от той же проверенной дисковой базы, TCG single thread, NIC отключён, ISO read-only, без host shares/физических дисков. GUI runner запущен явно из Проводника; после кода 0 диалог закрыт, VM остановлена штатным ACPI powerdown. Отчёт извлечён только после завершения QEMU. При первом 45-секундном ожидании выключение ещё продолжалось; повторное ожидание завершилось нормально, принудительная остановка не использовалась.
 
 [Отчёт unit64](evidence/spe-63/windows10-unit-64.txt) и [manifest v6](evidence/spe-63/payload-unit64-v6.manifest.json) дополняют прежние COM-наблюдения, но не заменяют проверку полного executor.
+
+## Набор unit72 v7
+
+Новый lib test EXE собран из `2f90f71` с тем же Public compile-time workspace; Rust-исходники проверены по хэшам. Payload содержит 72 tests, generated types, прежний GUI runner с совпадающим SHA-256 и manifest. COM probe в ISO не входит. Дополнительные 8 tests проверяют приватную recovery mapping, включая error/panic, отказ закрытия карты после durable receipt, restart и блокировку нового batch.
+
+На новом offline overlay прошли **72 tests, 0 failed/ignored, 60.12 s**. После GUI-кода 0 выполнен штатный ACPI powerdown. Два ожидания по 45 секунд истекли; затем QEMU завершился самостоятельно, принудительного quit/kill не было. При следующем read-only запросе QMP порт уже был закрыт. Отчёт извлечён после подтверждения завершения процесса, без записи в образ.
+
+[Отчёт unit72](evidence/spe-63/windows10-unit-72.txt) и [manifest v7](evidence/spe-63/payload-unit72-v7.manifest.json) относятся к journal/worker fixtures с искусственными receipts. Они не подтверждают actual staging/COM flow или устойчивость при потере питания. Значения manifest с ISO сохранены; форматирование JSON соответствует Prettier.
