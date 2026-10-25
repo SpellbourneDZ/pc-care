@@ -11,6 +11,7 @@ pub enum ScanEvent {
     Visited,
     Candidate(Candidate),
     Issue(ScanIssue),
+    StorageNode(StorageNode),
 }
 pub type ScanSink<'a> = dyn FnMut(ScanEvent) -> Result<(), ApiError> + 'a;
 const MAX_CANDIDATES: usize = 10_000;
@@ -32,6 +33,8 @@ struct State {
     tasks: HashMap<ScanTaskId, Task>,
     scans: HashMap<ScanId, ScanSnapshot>,
     plans: HashMap<PlanId, StoredPlan>,
+    storage: HashMap<ScanId, (Vec<StorageNode>, u64)>,
+    storage_last: HashMap<String, (String, u64)>,
 }
 struct Task {
     source: ScanKind,
@@ -46,6 +49,13 @@ struct StoredPlan {
 }
 
 impl Engine {
+    pub(crate) fn storage_last(&self, root: &str) -> Result<Option<(String, u64)>, ApiError> {
+        Ok(self
+            .lock()?
+            .storage_last
+            .get(&root[..2].to_ascii_uppercase())
+            .cloned())
+    }
     pub fn new(mock_enabled: bool) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
@@ -82,6 +92,15 @@ impl Engine {
         self.start_worker(ScanKind::Cleanup, timeout_ms, None, emit, worker)
     }
 
+    pub fn start_storage_scan(
+        &self,
+        timeout_ms: u32,
+        emit: impl FnMut(TaskProgress) -> bool + Send + 'static,
+        worker: impl FnOnce(&mut ScanSink<'_>) -> Result<(), ApiError> + Send + 'static,
+    ) -> Result<ScanTaskId, ApiError> {
+        self.start_worker(ScanKind::Storage, timeout_ms, None, emit, worker)
+    }
+
     fn start_worker(
         &self,
         source: ScanKind,
@@ -101,11 +120,11 @@ impl Engine {
         let id = ScanTaskId::new();
         {
             let mut state = self.lock()?;
-            if source == ScanKind::Cleanup
+            if source != ScanKind::Mock
                 && state
                     .tasks
                     .values()
-                    .any(|task| task.source == source && !task.worker_finished)
+                    .any(|task| task.source != ScanKind::Mock && !task.worker_finished)
             {
                 return Err(ApiError::Capacity);
             }
@@ -122,6 +141,13 @@ impl Engine {
                     state.scans.remove(&scan_id);
                     state.plans.retain(|_, p| p.plan.scan_id != scan_id);
                 }
+            }
+            if source == ScanKind::Storage {
+                // A single retained storage report bounds memory independently of task history.
+                state.storage.clear();
+                state
+                    .scans
+                    .retain(|_, scan| scan.source != ScanKind::Storage);
             }
             state.tasks.insert(
                 id,
@@ -198,6 +224,7 @@ impl Engine {
                 return Ok(());
             }
             let mut candidates = Vec::new();
+            let mut storage_nodes = Vec::new();
             let mut issues: Vec<ScanIssue> = Vec::new();
             let mut snapshot_bytes = 0_usize;
             let mut last_emit = Instant::now();
@@ -213,7 +240,13 @@ impl Engine {
                     }
                     match event {
                         ScanEvent::Visited => {
-                            if task.progress.processed >= MAX_VISITED {
+                            if task.progress.processed
+                                >= if source == ScanKind::Storage {
+                                    1_000_000
+                                } else {
+                                    MAX_VISITED
+                                }
+                            {
                                 return Err(ApiError::Capacity);
                             }
                             task.progress.processed += 1;
@@ -247,11 +280,34 @@ impl Engine {
                                 snapshot_bytes += std::mem::size_of::<ScanIssue>()
                                     + issue.rule_id.len()
                                     + issue.sample_path.as_ref().map_or(0, String::len);
-                                if snapshot_bytes > MAX_SNAPSHOT_BYTES {
+                                if snapshot_bytes
+                                    > if source == ScanKind::Storage {
+                                        super::storage::MAX_BYTES
+                                    } else {
+                                        MAX_SNAPSHOT_BYTES
+                                    }
+                                {
                                     return Err(ApiError::Capacity);
                                 }
                                 issues.push(issue);
                             }
+                        }
+                        ScanEvent::StorageNode(node) => {
+                            if source != ScanKind::Storage
+                                || node.id as usize != storage_nodes.len()
+                            {
+                                return Err(ApiError::Internal);
+                            }
+                            if storage_nodes.len() >= super::storage::MAX_NODES {
+                                return Err(ApiError::Capacity);
+                            }
+                            snapshot_bytes += std::mem::size_of::<StorageNode>()
+                                + node.name.len()
+                                + node.path.len();
+                            if snapshot_bytes > super::storage::MAX_BYTES {
+                                return Err(ApiError::Capacity);
+                            }
+                            storage_nodes.push(node);
                         }
                         ScanEvent::Checkpoint => {}
                     }
@@ -290,9 +346,33 @@ impl Engine {
                     });
                 }
                 let scan_id = ScanId::new();
+                if source == ScanKind::Storage {
+                    super::storage::aggregate(&mut storage_nodes)?;
+                }
+                let completed = if source == ScanKind::Storage {
+                    Some(
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map_err(|_| ApiError::Internal)?
+                            .as_millis() as u64,
+                    )
+                } else {
+                    None
+                };
                 task.progress.status = TaskStatus::Completed;
                 task.progress.scan_id = Some(scan_id);
                 let progress = task.progress.clone();
+                if let Some(completed) = completed {
+                    let root = storage_nodes
+                        .first()
+                        .ok_or(ApiError::Internal)?
+                        .path
+                        .clone();
+                    state
+                        .storage_last
+                        .insert(root[..2].to_ascii_uppercase(), (root, completed));
+                    state.storage.insert(scan_id, (storage_nodes, completed));
+                }
                 state.scans.insert(
                     scan_id,
                     ScanSnapshot {
@@ -366,6 +446,26 @@ impl Engine {
                 .cloned()
                 .collect(),
         })
+    }
+
+    pub fn get_storage_page(
+        &self,
+        id: ScanId,
+        query: StorageQuery,
+    ) -> Result<StoragePage, ApiError> {
+        let state = self.lock()?;
+        let scan = state.scans.get(&id).ok_or(ApiError::NotFound)?;
+        let (nodes, completed) = state.storage.get(&id).ok_or(ApiError::NotFound)?;
+        super::storage::page(scan, nodes, *completed, query)
+    }
+
+    pub(crate) fn storage_node(&self, id: ScanId, node_id: u32) -> Result<StorageNode, ApiError> {
+        self.lock()?
+            .storage
+            .get(&id)
+            .and_then(|(nodes, _)| nodes.get(node_id as usize))
+            .cloned()
+            .ok_or(ApiError::NotFound)
     }
 
     pub fn build_operation_plan(

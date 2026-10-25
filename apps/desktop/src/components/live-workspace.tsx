@@ -5,14 +5,18 @@ import { Button } from '@/ui/button'
 import { Card, CardContent, CardHeader } from '@/ui/card'
 import type { CleanupController } from '@/hooks/use-cleanup'
 import { CleanupScreen } from './cleanup-screen'
+import type { StorageController } from '@/hooks/use-storage'
+import { StorageScreen, Volumes } from './storage-screen'
 export function LiveWorkspace({
   page,
   onNavigate,
   cleanup,
+  storage,
 }: {
   page: PageId
   onNavigate: (page: PageId) => void
   cleanup: CleanupController
+  storage: StorageController
 }) {
   return (
     <div className="workspace">
@@ -53,22 +57,23 @@ export function LiveWorkspace({
               </h2>
             </CardHeader>
             <CardContent>
-              <p className="font-medium">{ru.volumeNotReady}</p>
-              <p className="supporting-text mt-2">
-                {ru.volumeNotReadyDescription}
-              </p>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => onNavigate('disks')}
-              >
-                {ru.openDisks}
-              </Button>
+              <Volumes
+                controller={storage}
+                onChoose={(path) => {
+                  storage.setPath(path)
+                  onNavigate('disks')
+                }}
+              />
             </CardContent>
           </Card>
         </>
       ) : page === 'cleanup' ? (
         <CleanupScreen controller={cleanup} />
+      ) : page === 'disks' ? (
+        <StorageScreen
+          controller={storage}
+          fixture={!!cleanup.catalog.data?.fixture_mode}
+        />
       ) : page === 'history' ? (
         <section className="empty-state">
           <History aria-hidden="true" />

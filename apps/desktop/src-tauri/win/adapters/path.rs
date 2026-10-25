@@ -78,6 +78,9 @@ impl LocalPath {
             .chain([0])
             .collect()
     }
+    pub(super) fn wide_path(&self) -> String {
+        format!(r"\\?\{}", self.0)
+    }
 }
 
 fn ordinal_equal(a: &str, b: &str) -> bool {

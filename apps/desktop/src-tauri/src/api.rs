@@ -32,6 +32,40 @@ fn dispatch(
     progress: Channel<TaskProgress>,
 ) -> Result<ApiResponse, ApiError> {
     Ok(match request {
+        ApiRequest::ListVolumes => {
+            let mut volumes = crate::win::adapters::storage::volumes()?;
+            for volume in &mut volumes {
+                if let Some((path, time)) = engine.storage_last(&volume.path)? {
+                    volume.last_scan_path = Some(path);
+                    volume.last_scan_ms = Some(time);
+                }
+            }
+            ApiResponse::Volumes(volumes)
+        }
+        ApiRequest::OpenStorageLocation { scan_id, node_id } => {
+            let node = engine.storage_node(scan_id, node_id)?;
+            crate::win::adapters::storage::show_location(
+                &node,
+                &settings.load()?.preferences.exclusions,
+            )?;
+            ApiResponse::StorageLocationOpened { node_id }
+        }
+        ApiRequest::StartStorageScan { path, timeout_ms } => {
+            let scanner = crate::win::adapters::storage::StorageScanner::current(
+                &path,
+                &settings.load()?.preferences.exclusions,
+            )?;
+            ApiResponse::ScanStarted {
+                task_id: engine.start_storage_scan(
+                    timeout_ms,
+                    move |p| progress.send(p).is_ok(),
+                    move |sink| scanner.scan(sink),
+                )?,
+            }
+        }
+        ApiRequest::GetStoragePage { scan_id, query } => {
+            ApiResponse::StoragePage(Box::new(engine.get_storage_page(scan_id, query)?))
+        }
         ApiRequest::GetCleanupRules => ApiResponse::CleanupRules(CleanupCatalog {
             rules: crate::domain::cleanup::rules(),
             fixture_mode: cfg!(feature = "qa-fixtures"),
@@ -59,6 +93,7 @@ fn dispatch(
                         move |sink| scanner.scan(sink),
                     )?
                 }
+                ScanKind::Storage => return Err(ApiError::InvalidRequest),
             };
             ApiResponse::ScanStarted { task_id }
         }
