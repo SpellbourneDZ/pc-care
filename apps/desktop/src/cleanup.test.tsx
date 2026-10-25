@@ -118,6 +118,9 @@ test('real flow selects Safe only, keeps review manual, previews exact IDs witho
   const dialog = await screen.findByRole('alertdialog')
   expect(dialog).toHaveTextContent('8,0 КиБ')
   expect(dialog).toHaveTextContent(ru.cleanupUx.previewOnly)
+  expect(
+    within(dialog).getByRole('button', { name: ru.cleanupUx.confirm }),
+  ).toBeDisabled()
   await user.click(within(dialog).getByRole('button', { name: ru.cancel }))
   expect(preview).toHaveFocus()
   await user.click(preview)
@@ -240,6 +243,17 @@ test('empty findings and typed failure remain recoverable without retrying mutat
   expect(
     api.mock.calls.filter(([request]) => request.type === 'start_scan'),
   ).toHaveLength(2)
+  api.mockImplementation(original)
+  await user.click(screen.getByRole('button', { name: ru.cleanupUx.scan }))
+  await waitFor(() =>
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument(),
+  )
+  expect(
+    await screen.findByRole('heading', { name: ru.cleanupUx.noFindings }),
+  ).toBeVisible()
+  expect(
+    api.mock.calls.filter(([request]) => request.type === 'start_scan'),
+  ).toHaveLength(3)
 })
 test('expired preview requires a fresh plan and never confirms', async () => {
   const refresh = vi.fn(),

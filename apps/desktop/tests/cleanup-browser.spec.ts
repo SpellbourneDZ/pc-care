@@ -18,6 +18,7 @@ async function fixture(
   await page.addInitScript(
     ({ catalog, result, mode }) => {
       let cancelled = false
+      let failed = false
       const task = () => ({
         task_id: 'task',
         status: cancelled
@@ -55,9 +56,11 @@ async function fixture(
                 return ok({ type: 'cleanup_rules', data: catalog })
               case 'start_scan':
                 cancelled = false
-                return mode === 'error'
-                  ? { status: 'error', error: 'adapter_error' }
-                  : ok({ type: 'scan_started', data: { task_id: 'task' } })
+                if (mode === 'error' && !failed) {
+                  failed = true
+                  return { status: 'error', error: 'adapter_error' }
+                }
+                return ok({ type: 'scan_started', data: { task_id: 'task' } })
               case 'get_task':
                 return { status: 'ok', value: { type: 'task', data: task() } }
               case 'cancel_task':
@@ -212,6 +215,15 @@ test('cleanup IPC fixture: empty, partial, failed and cancellable progress recov
         ).toBeVisible()
       }
       await next.screenshot({ path: info.outputPath(`cleanup-${mode}.png`) })
+      if (mode === 'error') {
+        await next
+          .getByRole('button', { name: ru.cleanupUx.scan, exact: true })
+          .click()
+        await expect(next.getByRole('alert')).not.toBeVisible()
+        await expect(
+          next.getByRole('heading', { name: ru.cleanupUx.ready, exact: true }),
+        ).toBeVisible()
+      }
     } finally {
       await next.close()
     }

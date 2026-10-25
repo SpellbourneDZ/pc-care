@@ -1,9 +1,41 @@
 import { resolve } from 'node:path'
+import { createServer } from 'node:http'
 import { expect, test } from '@playwright/test'
 import { ru } from '../src/i18n/ru'
 import type { ApiReply } from '../src/generated/ApiReply'
 import { checkPrototypeFlow } from './ui-flow'
-import { startNative } from './native-app'
+import { startNative, waitForPageTarget } from './native-app'
+
+test('native startup waits for a debuggable page after the CDP port is ready', async () => {
+  let requests = 0
+  const responses = [
+    null,
+    {},
+    [],
+    [{ type: 'worker' }],
+    [{ type: 'page' }],
+    [{ type: 'page', webSocketDebuggerUrl: 'ws://127.0.0.1/fixture' }],
+  ]
+  const server = createServer((request, response) => {
+    expect(request.url).toBe('/json/list')
+    response.setHeader('Content-Type', 'application/json')
+    response.end(JSON.stringify(responses[requests++]))
+  })
+  await new Promise<void>((accept) => server.listen(0, '127.0.0.1', accept))
+  try {
+    const address = server.address()
+    if (!address || typeof address === 'string')
+      throw new Error('No fixture port')
+    let checked = 0
+    await waitForPageTarget(`http://127.0.0.1:${address.port}`, () => checked++)
+    expect(requests).toBe(responses.length)
+    expect(checked).toBe(requests)
+  } finally {
+    await new Promise<void>((accept, reject) =>
+      server.close((error) => (error ? reject(error) : accept())),
+    )
+  }
+})
 
 test('release executable renders offline in Windows WebView2', async ({
   playwright,
@@ -26,6 +58,32 @@ test('release executable renders offline in Windows WebView2', async ({
     ).toBeVisible()
     await expect(page.getByText(ru.exampleData)).not.toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('overview.png') })
+    await page.getByRole('button', { name: ru.openCleanup }).click()
+    await expect(page.getByText(ru.cleanupUx.previewOnly)).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('read-only-start.png') })
+    await page
+      .getByRole('button', { name: ru.cleanupUx.scan, exact: true })
+      .click()
+    await expect(
+      page.getByRole('heading', { name: ru.cleanupUx.ready, exact: true }).or(
+        page.getByRole('heading', {
+          name: ru.cleanupUx.noFindings,
+          exact: true,
+        }),
+      ),
+    ).toBeVisible({ timeout: 30_000 })
+    await expect(
+      page.getByText(ru.cleanupUx.fixture, { exact: false }),
+    ).not.toBeVisible()
+    await page.screenshot({
+      path: testInfo.outputPath('read-only-results.png'),
+    })
+    await page.getByRole('button', { name: ru.settings, exact: true }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.screenshot({
+      path: testInfo.outputPath('read-only-settings.png'),
+    })
+    await page.keyboard.press('Escape')
     await page.keyboard.press('Control+k')
     await expect(
       page.getByRole('dialog', { name: ru.quickSearch }),

@@ -4,6 +4,8 @@
 
 ## Разработка
 
+**Запуск готовой Windows-сборки:** [read-only preview — EXE, демонстрация и ограничения](docs/SPE-64-preview.md). Merge PR и инструменты разработки для запуска EXE не нужны.
+
 - [Инструкция для Windows](docs/README.windows.md)
 - [Архитектура и постоянные инструкции](AGENTS.md)
 - [Результат SPE-55 и проверки](docs/SPE-55-review.md)
