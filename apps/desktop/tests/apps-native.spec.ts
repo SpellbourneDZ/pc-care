@@ -59,6 +59,9 @@ test('apps native: isolated compiled registrations use actual IPC and cannot lau
     await expect(msi.getByRole('status')).toContainText(
       ru.appsUx.checkStatuses.msi_matched,
     )
+    await expect(msi.getByRole('status')).toContainText(
+      ru.appsUx.binaryStatuses.fixture,
+    )
     await expect(
       msi.getByRole('button', { name: ru.appsUx.uninstall, exact: true }),
     ).toBeDisabled()

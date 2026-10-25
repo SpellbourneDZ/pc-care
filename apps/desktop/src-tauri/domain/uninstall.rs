@@ -24,6 +24,16 @@ pub enum UninstallCheckStatus {
     AccessDenied,
     Unavailable,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum InstallerBinaryStatus {
+    MicrosoftSignatureOffline,
+    UntrustedSignature,
+    UnsafePath,
+    TargetChanged,
+    Unavailable,
+    Fixture,
+}
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 pub struct MsiUninstallPreview {
@@ -39,6 +49,7 @@ pub struct UninstallCheck {
     pub status: UninstallCheckStatus,
     pub preview: Option<MsiUninstallPreview>,
     pub execution_enabled: bool,
+    pub binary: Option<InstallerBinaryStatus>,
 }
 pub struct MsiProduct {
     pub context: MsiContext,

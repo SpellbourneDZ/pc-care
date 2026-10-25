@@ -3,6 +3,18 @@ use crate::domain::{apps::InstalledApp, contracts::ScanId, uninstall::*};
 
 pub fn check(snapshot_id: ScanId, app: &InstalledApp) -> UninstallCheck {
     let result = assess(app);
+    let binary = if result.is_ok() {
+        #[cfg(not(feature = "qa-fixtures"))]
+        {
+            Some(super::installer_binary::check())
+        }
+        #[cfg(feature = "qa-fixtures")]
+        {
+            Some(InstallerBinaryStatus::Fixture)
+        }
+    } else {
+        None
+    };
     UninstallCheck {
         snapshot_id,
         app_id: app.id.clone(),
@@ -11,6 +23,7 @@ pub fn check(snapshot_id: ScanId, app: &InstalledApp) -> UninstallCheck {
             .map_or_else(|s| *s, |_| UninstallCheckStatus::MsiMatched),
         preview: result.ok(),
         execution_enabled: false,
+        binary,
     }
 }
 #[cfg(not(feature = "qa-fixtures"))]

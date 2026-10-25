@@ -5,7 +5,8 @@ import type { InstalledApp } from '../src/generated/InstalledApp'
 const u = ru.appsUx
 async function fixture(
   page: Page,
-  mode: 'ready' | 'empty' | 'partial' | 'error' | 'loading' = 'ready',
+  mode:
+    'ready' | 'empty' | 'partial' | 'error' | 'loading' | 'untrusted' = 'ready',
 ) {
   await page.addInitScript(
     () => {
@@ -130,6 +131,12 @@ async function fixture(
                           ? 'metadata_mismatch'
                           : 'msi_matched',
                       execution_enabled: false,
+                      binary:
+                        mode === 'partial'
+                          ? null
+                          : mode === 'untrusted'
+                            ? 'untrusted_signature'
+                            : 'microsoft_signature_offline',
                       preview:
                         mode === 'partial'
                           ? null
@@ -212,7 +219,7 @@ test('apps fixture: empty, partial, retry and loading are explicit', async ({
 test('MSI check fixture: matched and mismatched identities never enable uninstall', async ({
   page,
 }, info) => {
-  for (const mode of ['ready', 'partial'] as const) {
+  for (const mode of ['ready', 'partial', 'untrusted'] as const) {
     await fixture(page, mode)
     await page
       .getByRole('row')
@@ -223,10 +230,16 @@ test('MSI check fixture: matched and mismatched identities never enable uninstal
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('button', { name: u.check, exact: true }).click()
     await expect(dialog.getByRole('status')).toContainText(
-      mode === 'ready'
-        ? u.checkStatuses.msi_matched
-        : u.checkStatuses.metadata_mismatch,
+      mode === 'partial'
+        ? u.checkStatuses.metadata_mismatch
+        : u.checkStatuses.msi_matched,
     )
+    if (mode !== 'partial')
+      await expect(dialog.getByRole('status')).toContainText(
+        mode === 'ready'
+          ? u.binaryStatuses.microsoft_signature_offline
+          : u.binaryStatuses.untrusted_signature,
+      )
     await expect(
       dialog.getByRole('button', { name: u.uninstall, exact: true }),
     ).toBeDisabled()

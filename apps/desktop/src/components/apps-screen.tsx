@@ -313,6 +313,11 @@ export function AppsScreen({ controller: c }: { controller: AppsController }) {
                     <div className="notice" role="status">
                       <div>
                         <p>{u.checkStatuses[c.checkResult.status]}</p>
+                        {c.checkResult.binary && (
+                          <p className="supporting-text">
+                            {u.binaryStatuses[c.checkResult.binary]}
+                          </p>
+                        )}
                         {c.checkResult.preview && (
                           <p className="supporting-text">
                             {u.contexts[c.checkResult.preview.context]}

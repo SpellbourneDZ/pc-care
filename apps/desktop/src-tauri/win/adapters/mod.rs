@@ -4,6 +4,8 @@ pub mod apps;
 pub mod cleanup;
 #[cfg(windows)]
 pub mod files;
+#[cfg(all(windows, not(feature = "qa-fixtures")))]
+mod installer_binary;
 #[cfg(windows)]
 pub mod path;
 #[cfg(windows)]

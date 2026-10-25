@@ -30,15 +30,25 @@ EstimatedSize переводится из KiB в целые bytes и помеч�
 
 `MsiGetProductInfoExW` читает состояние и сведения о продукте с NULL SID: только контекст машины или текущего пользователя. Проверяются machine, user managed и user unmanaged. Допустима ровно одна регистрация с State=5 и контекстом, соответствующим HKCU/HKLM; несколько контекстов, только advertised, отсутствие установки, неизвестность или отказ доступа не дают положительного результата. InstalledProductName, Publisher и VersionString должны точно совпасть со снимком, а регистрация повторно сверяется после MSI-запросов. Изменённый/заменённый snapshot ID отклоняется. Это read-only сверка живых данных, не доказательство устранения race для будущей мутации.
 
-Положительный результат — **msi_matched**, не разрешение удалить. Backend возвращает предложение аргументов `/x`, canonical ProductCode, `/norestart`; оно не исполняется, не включает тихое удаление, принудительную перезагрузку или произвольные MSI properties и не является OperationPlan. `execution_enabled=false` при любом результате; команды запуска в IPC нет. Путь/подпись msiexec, полномочия, точное подтверждение и поведение uninstall ещё не доказаны. Совпадение регистраций не является цифровой подписью издателя или гарантией безопасности custom actions MSI.
+Положительный результат — **msi_matched**, не разрешение удалить. Backend возвращает предложение аргументов `/x`, canonical ProductCode, `/norestart`; оно не исполняется, не включает тихое удаление, принудительную перезагрузку или произвольные MSI properties и не является OperationPlan. `execution_enabled=false` при любом результате; команды запуска в IPC нет. Совпадение регистраций не является цифровой подписью издателя или гарантией безопасности custom actions MSI. Read-only проверка системного binary описана ниже; полномочия, точное подтверждение и поведение uninstall ещё не доказаны.
 
 UI показывает состояние и контекст установки, сохраняет выключенной кнопку удаления, отклоняет результат с чужими snapshot/app IDs, сбрасывает старый результат при смене записи/фильтров/обновлении. Ошибка видна внутри карточки. QA использует вымышленный GUID и скомпилированные MSI properties только после проверки fixture root; ни одного реального MSI query/процесса в QA нет.
+
+## Системный установщик: read-only проверка файла и подписи
+
+После совпадения MSI backend отдельно проверяет фиксированный `msiexec.exe` из `GetSystemDirectoryW`. PATH, переменные среды и UninstallString не участвуют. Каждый каталог пути удерживается с FILE_LIST_DIRECTORY без delete sharing, файл — с GENERIC_READ без write/delete sharing. Проверяются fixed drive, canonical path, reparse/cloud/encrypted/case-sensitive paths и обычный файл. Identity, размер, timestamps, атрибуты и число ссылок сравниваются до/после проверки. Наличие системных hardlinks Windows/WinSxS допускается для чтения, не даёт права на удаление и не меняет cleanup allowlist.
+
+WinVerifyTrust получает удерживаемый file handle, не запускает файл и не показывает UI. Принимается только нулевой результат проверки и Organization=`Microsoft Corporation` из сертификата signer chain. Имена файла или издателя из реестра не считаются подписью. Проверяются embedded signatures; **только** при TRUST_E_NOSIGNATURE проверяется SHA-256 membership в локальных подписанных каталогах Windows, максимум 16. Один факт наличия хеша в каталоге недостаточен: проверяются каталог, membership и подпись. Ошибки embedded подписи не обходятся другим способом. SHA-1-only catalogs сейчас не поддерживаются и дают неподтверждённый результат.
+
+Проверка использует локальную trust policy и кеш: WTD_CACHE_ONLY_URL_RETRIEVAL, без online retrieval и revocation check. UI прямо сообщает, что **отзыв сертификата не проверялся**. Trust state/catalog contexts освобождаются при любом выходе. SHA-256 считается Windows Catalog API, новой crypto dependency нет. Никаких изменений catalog DB, сертификатов, trust policy или system files приложение не выполняет.
+
+В API возвращается отдельный binary status, а не разрешение запуска. В QA — `fixture` с текстом о том, что настоящая подпись не проверяется; trust probe в этой сборке не компилируется. Browser fixtures могут показывать моделируемый положительный/отрицательный статус с явной маркировкой. Handles освобождаются после чтения, результат не устраняет race **будущего** запуска. Проверка прав, удержание/повторная проверка в момент запуска, точное подтверждение и VM evidence остаются обязательными.
 
 ## Что не реализовано
 
 **Все действия удаления заблокированы.** `not_validated` означает наличие ещё не проверенного способа, `missing_method` — отсутствие способа в источнике, `protected` — системный/служебный/NoRemove либо неизвестный безопасный статус пакета. IPC команды запуска нет, нажатие не может вызвать процесс или UAC. Это не замена штатного uninstall и не выполненный AC его запуска.
 
-Остаются штатные MSI/EXE/MSIX uninstall providers с проверкой executable target/signature/privileges, точным подтверждением, контролем внешнего процесса и проверкой установленного состояния после завершения. Read-only MSI identity/context и контролируемые аргументы реализованы, но не допускают запуск. Exit code не будет считаться доказательством полного удаления. Нужны dry-run и disposable Windows VM с checkpoint на искусственных MSI/EXE/MSIX. Хост для этого не используется.
+Остаются штатные MSI/EXE/MSIX uninstall providers с проверкой privileges и цели **в момент запуска**, точным подтверждением, контролем внешнего процесса и проверкой установленного состояния после завершения. Read-only MSI identity/context, контролируемые аргументы и read-only file/signature evidence реализованы, но не допускают запуск. Exit code не будет считаться доказательством полного удаления. Нужны dry-run и disposable Windows VM с checkpoint на искусственных MSI/EXE/MSIX. Хост для этого не используется.
 
 Скан связанных файлов/ключей, evidence/confidence, защита shared data, ручной выбор, registry backup/проверка, индивидуальные результаты, отмена, история и экспорт результата ещё не реализованы. Кнопка «Найти остатки» недоступна с пояснением. Не выполняется поиск по одной подстроке имени. Системный gate SPE-63 не включался.
 
@@ -50,7 +60,9 @@ Production/QA build и 2 production + 5 QA native tests прошли. После
 
 Этап MSI check: прошли 71 Rust test, 33 frontend tests, полный прогон 65 browser-сценариев, typecheck/lint/format/bindings, default/all-features clippy, production/QA build и все 7 native tests. Native QA проверяет, что искусственный MSI даёт msi_matched, но не включает удаление. Реальная read-only калибровка через Windows Installer API проверила 8 подходящих регистраций: 7 совпадений, 1 неположительный результат. В выводе только счётчики, без имён, GUID и путей. Это не uninstall/VM proof. Первый этап `b59c87c` прошёл полный hosted Windows CI [40177592297](https://github.com/SpellbourneDZ/pc-care/actions/runs/40177592297); свежий этап запускает новый CI после push.
 
-`pnpm build` создаёт обычный `target/release/pc-care.exe`. Локальная копия с MSI check — `target/apps-msi-preview/pc-care.exe`, рядом manifest и инструкция. Первый этап остаётся в `target/apps-preview`; его manifest/архив b59c87c не подменяются новой сборкой. Ранее сохранённые SPE-64/65/70 пакеты тоже не меняются. Ничего не слито, Done/релиз не публикуются автоматически.
+Этап signature check: прошли 74 Rust tests, 33 frontend tests, 65 browser tests, production/QA build, 2 production + 5 QA native tests, typecheck/lint/format/bindings и default/all-features clippy. Дополнительно 5 целевых browser checks прошли после добавления отдельного состояния «MSI совпал, подпись не подтверждена». Реальный системный msiexec подтверждён через SHA-256 catalog signature; неподписанный файл и изменённая искусственная копия отклонены. Каталог вместо файла отклоняется, удерживаемый файл нельзя заново открыть на запись. Fixtures не запускаются, не удаляются и не входят в Git/публикуемые artifacts. Отдельные signer/root-store/CRL mutation scenarios на хосте не создавались. Этап `11897b8` прошёл hosted CI [40181631653](https://github.com/SpellbourneDZ/pc-care/actions/runs/40181631653); новые изменения запускают свежий CI.
+
+`pnpm build` создаёт обычный `target/release/pc-care.exe`. Локальная копия с MSI и signature checks — `target/apps-trust-preview/pc-care.exe`, рядом manifest и инструкция. Предыдущие этапы остаются в `target/apps-preview` и `target/apps-msi-preview`; их manifest/архивы не подменяются новой сборкой. Ранее сохранённые SPE-64/65/70 пакеты тоже не меняются. Ничего не слито, Done/релиз не публикуются автоматически.
 
 ## Скриншоты
 
@@ -68,6 +80,12 @@ Production/QA build и 2 production + 5 QA native tests прошли. После
 
 ![Отказ при несовпадении MSI — browser fixture](evidence/spe-74/06-msi-mismatch.png)
 
+![QA явно не проверяет настоящий системный binary](evidence/spe-74/07-native-signature-fixture.png)
+
+![Отказ при неподтверждённой подписи — browser fixture](evidence/spe-74/08-signature-untrusted.png)
+
 API references: [Uninstall Registry metadata](https://learn.microsoft.com/en-us/windows/win32/msi/uninstall-registry-key), [PackageManager.FindPackagesForUser](https://learn.microsoft.com/en-us/uwp/api/windows.management.deployment.packagemanager.findpackagesforuser?view=winrt-26100).
 
 MSI references: [MsiGetProductInfoExW](https://learn.microsoft.com/en-us/windows/win32/api/msi/nf-msi-msigetproductinfoexw), [msiexec options](https://learn.microsoft.com/windows-server/administration/windows-commands/msiexec).
+
+Signature references: [WinVerifyTrust](https://learn.microsoft.com/en-us/windows/win32/api/Wintrust/nf-wintrust-winverifytrust), [offline trust flags](https://learn.microsoft.com/en-us/windows/win32/api/wintrust/ns-wintrust-wintrust_data), [catalog member verification](https://learn.microsoft.com/en-us/windows/win32/api/Wintrust/ns-wintrust-wintrust_catalog_info), [catalog enumeration sample](https://github.com/microsoft/Windows-classic-samples/blob/main/Samples/Security/CodeSigning/cpp/codesigning.cpp).

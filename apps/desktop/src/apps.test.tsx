@@ -116,6 +116,7 @@ beforeEach(() => {
                 checkMode === 'foreign' ? 'other-app' : request.data.app_id,
               status: 'msi_matched',
               execution_enabled: false,
+              binary: 'fixture',
               preview: {
                 product_code: '{62E06E1F-50AF-4C56-A5C8-2C8E2FBEA775}',
                 context: 'user_unmanaged',
@@ -148,6 +149,9 @@ test('MSI check shows a read-only match and clears it when changing the selected
   await user.click(within(dialog).getByRole('button', { name: u.check }))
   expect(await within(dialog).findByRole('status')).toHaveTextContent(
     u.checkStatuses.msi_matched,
+  )
+  expect(within(dialog).getByRole('status')).toHaveTextContent(
+    u.binaryStatuses.fixture,
   )
   expect(
     within(dialog).getByRole('button', { name: u.uninstall }),
