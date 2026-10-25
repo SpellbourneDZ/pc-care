@@ -7,16 +7,20 @@ import type { CleanupController } from '@/hooks/use-cleanup'
 import { CleanupScreen } from './cleanup-screen'
 import type { StorageController } from '@/hooks/use-storage'
 import { StorageScreen, Volumes } from './storage-screen'
+import { StartupScreen } from './startup-screen'
+import type { StartupController } from '@/hooks/use-startup'
 export function LiveWorkspace({
   page,
   onNavigate,
   cleanup,
   storage,
+  startup,
 }: {
   page: PageId
   onNavigate: (page: PageId) => void
   cleanup: CleanupController
   storage: StorageController
+  startup: StartupController
 }) {
   return (
     <div className="workspace">
@@ -74,6 +78,8 @@ export function LiveWorkspace({
           controller={storage}
           fixture={!!cleanup.catalog.data?.fixture_mode}
         />
+      ) : page === 'startup' ? (
+        <StartupScreen controller={startup} />
       ) : page === 'history' ? (
         <section className="empty-state">
           <History aria-hidden="true" />

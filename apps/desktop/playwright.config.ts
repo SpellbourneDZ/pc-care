@@ -7,6 +7,7 @@ export default defineConfig({
     'browser.spec.ts',
     'cleanup-browser.spec.ts',
     'storage-browser.spec.ts',
+    'startup-browser.spec.ts',
   ],
   forbidOnly: !!process.env.CI,
   workers: 2,

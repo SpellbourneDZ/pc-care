@@ -35,6 +35,7 @@ struct State {
     plans: HashMap<PlanId, StoredPlan>,
     storage: HashMap<ScanId, (Vec<StorageNode>, u64)>,
     storage_last: HashMap<String, (String, u64)>,
+    startup: Option<super::startup::StartupSnapshot>,
 }
 struct Task {
     source: ScanKind,
@@ -49,6 +50,35 @@ struct StoredPlan {
 }
 
 impl Engine {
+    pub(crate) fn publish_startup(
+        &self,
+        snapshot: super::startup::StartupSnapshot,
+    ) -> Result<StartupCatalog, ApiError> {
+        let catalog = snapshot.catalog.clone();
+        self.lock()?.startup = Some(snapshot);
+        Ok(catalog)
+    }
+    pub(crate) fn startup_page(
+        &self,
+        id: ScanId,
+        query: StartupQuery,
+    ) -> Result<StartupPage, ApiError> {
+        self.lock()?
+            .startup
+            .as_ref()
+            .filter(|s| s.catalog.id == id)
+            .ok_or(ApiError::NotFound)?
+            .page(query)
+    }
+    pub(crate) fn startup_location(&self, id: ScanId, entry: u32) -> Result<StorageNode, ApiError> {
+        self.lock()?
+            .startup
+            .as_ref()
+            .filter(|s| s.catalog.id == id)
+            .and_then(|s| s.entries.get(entry as usize))
+            .and_then(|e| e.location.clone())
+            .ok_or(ApiError::Unsupported)
+    }
     pub(crate) fn storage_last(&self, root: &str) -> Result<Option<(String, u64)>, ApiError> {
         Ok(self
             .lock()?

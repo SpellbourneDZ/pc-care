@@ -5,4 +5,5 @@ pub mod contracts;
 pub mod engine;
 mod mock;
 pub mod policy;
+pub mod startup;
 pub mod storage;

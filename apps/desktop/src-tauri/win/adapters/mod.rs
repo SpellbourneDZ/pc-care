@@ -7,4 +7,6 @@ pub mod path;
 #[cfg(windows)]
 pub mod preferences;
 #[cfg(windows)]
+pub mod startup;
+#[cfg(windows)]
 pub mod storage;

@@ -23,7 +23,7 @@ ts-rs = { version = "=12.0.1", features = ["no-serde-warnings"] }
 uuid = { version = "=1.29.0", features = ["v4", "serde"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Globalization", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Diagnostics_ToolHelp", "Win32_UI_Shell", "Win32_UI_Shell_Common"] }
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Globalization", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Registry", "Win32_UI_Shell", "Win32_UI_Shell_Common"] }
 
 [target.'cfg(windows)'.dev-dependencies]
 windows-sys = { version = "=0.61.2", features = ["Win32_Security_Authorization", "Win32_System_IO", "Win32_System_Ioctl"] }

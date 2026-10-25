@@ -5,8 +5,10 @@ import type { OperationPlan } from "./OperationPlan";
 import type { OperationResult } from "./OperationResult";
 import type { ScanTaskId } from "./ScanTaskId";
 import type { SettingsSnapshot } from "./SettingsSnapshot";
+import type { StartupCatalog } from "./StartupCatalog";
+import type { StartupPage } from "./StartupPage";
 import type { StoragePage } from "./StoragePage";
 import type { TaskProgress } from "./TaskProgress";
 import type { VolumeInfo } from "./VolumeInfo";
 
-export type ApiResponse = { "type": "volumes", "data": Array<VolumeInfo> } | { "type": "storage_location_opened", "data": { node_id: number, } } | { "type": "storage_page", "data": StoragePage } | { "type": "cleanup_rules", "data": CleanupCatalog } | { "type": "preferences", "data": SettingsSnapshot } | { "type": "scan_started", "data": { task_id: ScanTaskId, } } | { "type": "task", "data": TaskProgress } | { "type": "scan_result", "data": CandidatePage } | { "type": "operation_plan", "data": OperationPlan } | { "type": "operation_result", "data": OperationResult };
+export type ApiResponse = { "type": "startup_catalog", "data": StartupCatalog } | { "type": "startup_page", "data": StartupPage } | { "type": "volumes", "data": Array<VolumeInfo> } | { "type": "storage_location_opened", "data": { node_id: number, } } | { "type": "storage_page", "data": StoragePage } | { "type": "cleanup_rules", "data": CleanupCatalog } | { "type": "preferences", "data": SettingsSnapshot } | { "type": "scan_started", "data": { task_id: ScanTaskId, } } | { "type": "task", "data": TaskProgress } | { "type": "scan_result", "data": CandidatePage } | { "type": "operation_plan", "data": OperationPlan } | { "type": "operation_result", "data": OperationResult };

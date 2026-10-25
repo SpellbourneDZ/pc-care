@@ -7,6 +7,7 @@ export default defineConfig({
     'settings-native.spec.ts',
     'cleanup-native.spec.ts',
     'storage-native.spec.ts',
+    'startup-native.spec.ts',
   ],
   forbidOnly: !!process.env.CI,
   workers: 1,

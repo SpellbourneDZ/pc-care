@@ -1,3 +1,4 @@
+pub use super::startup::{StartupCatalog, StartupPage, StartupQuery};
 pub use super::storage::{StorageNode, StoragePage, StorageQuery, VolumeInfo};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -268,6 +269,15 @@ pub struct StartScanRequest {
     deny_unknown_fields
 )]
 pub enum ApiRequest {
+    RefreshStartup,
+    GetStartupPage {
+        snapshot_id: ScanId,
+        query: StartupQuery,
+    },
+    OpenStartupLocation {
+        snapshot_id: ScanId,
+        entry_id: u32,
+    },
     ListVolumes,
     OpenStorageLocation {
         scan_id: ScanId,
@@ -317,6 +327,8 @@ pub enum ApiRequest {
     deny_unknown_fields
 )]
 pub enum ApiResponse {
+    StartupCatalog(StartupCatalog),
+    StartupPage(StartupPage),
     Volumes(Vec<VolumeInfo>),
     StorageLocationOpened { node_id: u32 },
     StoragePage(Box<StoragePage>),
