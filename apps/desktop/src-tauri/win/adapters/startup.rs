@@ -156,62 +156,12 @@ fn denial(reason: crate::domain::policy::Denial) -> StartupIssueReason {
     }
 }
 #[cfg(not(feature = "qa-fixtures"))]
-struct Key(HKEY);
-#[cfg(not(feature = "qa-fixtures"))]
-impl Drop for Key {
-    fn drop(&mut self) {
-        unsafe { RegCloseKey(self.0) };
-    }
-}
-
-#[cfg(not(feature = "qa-fixtures"))]
-fn run_key(hive: HKEY, view: u32) -> Result<Option<Vec<Key>>, StartupIssueReason> {
-    let mut keys: Vec<Key> = Vec::new();
-    let link_name: Vec<u16> = "SymbolicLinkValue".encode_utf16().chain([0]).collect();
-    for part in RUN.split('\\') {
-        let name: Vec<u16> = part.encode_utf16().chain([0]).collect();
-        let mut raw = ptr::null_mut();
-        let parent = keys.last().map_or(hive, |key| key.0);
-        let status = unsafe {
-            RegOpenKeyExW(
-                parent,
-                name.as_ptr(),
-                REG_OPTION_OPEN_LINK,
-                KEY_QUERY_VALUE | view,
-                &mut raw,
-            )
-        };
-        if status == ERROR_FILE_NOT_FOUND {
-            return Ok(None);
-        }
-        if status != ERROR_SUCCESS {
-            return Err(if status == ERROR_ACCESS_DENIED {
-                StartupIssueReason::AccessDenied
-            } else {
-                StartupIssueReason::Unavailable
-            });
-        }
-        let key = Key(raw);
-        let (mut kind, mut bytes) = (0, 0);
-        let status = unsafe {
-            RegQueryValueExW(
-                key.0,
-                link_name.as_ptr(),
-                ptr::null(),
-                &mut kind,
-                ptr::null_mut(),
-                &mut bytes,
-            )
-        };
-        if (status == ERROR_SUCCESS || status == ERROR_MORE_DATA) && kind == REG_LINK {
-            return Err(StartupIssueReason::UnsafePath);
-        }
-        if status != ERROR_SUCCESS && status != ERROR_FILE_NOT_FOUND {
-            return Err(StartupIssueReason::Unavailable);
-        }
-        keys.push(key);
-    }
-    Ok(Some(keys))
+fn run_key(hive: HKEY, view: u32) -> Result<Option<Vec<super::registry::Key>>, StartupIssueReason> {
+    super::registry::open(hive, RUN, view, false).map_err(|error| match error.kind() {
+        std::io::ErrorKind::PermissionDenied => StartupIssueReason::AccessDenied,
+        std::io::ErrorKind::InvalidInput => StartupIssueReason::UnsafePath,
+        _ => StartupIssueReason::Unavailable,
+    })
 }
 
 fn registry_entries(snapshot: &mut StartupSnapshot, source: StartupSource) {

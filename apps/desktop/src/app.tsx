@@ -12,6 +12,7 @@ import { useTheme, type Theme } from '@/hooks/use-theme'
 import { useCleanup } from '@/hooks/use-cleanup'
 import { useStorage } from '@/hooks/use-storage'
 import { useStartup } from '@/hooks/use-startup'
+import { useApps } from '@/hooks/use-apps'
 import { routeHash, useRoute } from '@/lib/routes'
 import { usePreferences, preferencesErrorMessage } from '@/lib/preferences'
 import type { PageId } from '@/preview/data'
@@ -31,6 +32,7 @@ function Shell() {
     preferences.query.error,
   )
   const storage = useStorage(!route.preview, snapshot?.revision)
+  const apps = useApps(!route.preview && route.page === 'apps')
   const startup = useStartup(
     !route.preview && route.page === 'startup',
     snapshot?.revision,
@@ -140,6 +142,7 @@ function Shell() {
               cleanup={cleanup}
               storage={storage}
               startup={startup}
+              apps={apps}
             />
           )}
           <footer className="app-status">

@@ -9,18 +9,22 @@ import type { StorageController } from '@/hooks/use-storage'
 import { StorageScreen, Volumes } from './storage-screen'
 import { StartupScreen } from './startup-screen'
 import type { StartupController } from '@/hooks/use-startup'
+import type { AppsController } from '@/hooks/use-apps'
+import { AppsScreen } from './apps-screen'
 export function LiveWorkspace({
   page,
   onNavigate,
   cleanup,
   storage,
   startup,
+  apps,
 }: {
   page: PageId
   onNavigate: (page: PageId) => void
   cleanup: CleanupController
   storage: StorageController
   startup: StartupController
+  apps: AppsController
 }) {
   return (
     <div className="workspace">
@@ -80,6 +84,8 @@ export function LiveWorkspace({
         />
       ) : page === 'startup' ? (
         <StartupScreen controller={startup} />
+      ) : page === 'apps' ? (
+        <AppsScreen controller={apps} />
       ) : page === 'history' ? (
         <section className="empty-state">
           <History aria-hidden="true" />

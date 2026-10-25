@@ -66,6 +66,13 @@ test('release executable renders offline in Windows WebView2', async ({
       page.getByText(ru.cleanupUx.fixture, { exact: false }),
     ).not.toBeVisible()
     await expect(page.getByRole('switch')).not.toBeVisible()
+    await page.getByRole('link', { name: ru.apps, exact: true }).click()
+    await expect(
+      page.getByText(ru.appsUx.collected, { exact: false }),
+    ).toBeVisible({ timeout: 30_000 })
+    await expect(
+      page.getByText(ru.cleanupUx.fixture, { exact: false }),
+    ).not.toBeVisible()
     await page.getByRole('link', { name: ru.overview, exact: true }).click()
     await page.getByRole('button', { name: ru.openCleanup }).click()
     await expect(page.getByText(ru.cleanupUx.previewOnly)).toBeVisible()

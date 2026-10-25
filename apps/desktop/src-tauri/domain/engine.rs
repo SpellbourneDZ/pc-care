@@ -36,6 +36,7 @@ struct State {
     storage: HashMap<ScanId, (Vec<StorageNode>, u64)>,
     storage_last: HashMap<String, (String, u64)>,
     startup: Option<super::startup::StartupSnapshot>,
+    apps: Option<super::apps::AppSnapshot>,
 }
 struct Task {
     source: ScanKind,
@@ -50,6 +51,38 @@ struct StoredPlan {
 }
 
 impl Engine {
+    pub(crate) fn app(
+        &self,
+        id: ScanId,
+        app_id: &str,
+    ) -> Result<super::apps::InstalledApp, ApiError> {
+        if app_id.len() > 4096 {
+            return Err(ApiError::InvalidRequest);
+        }
+        self.lock()?
+            .apps
+            .as_ref()
+            .filter(|s| s.catalog.id == id)
+            .and_then(|s| s.entries.iter().find(|e| e.id == app_id))
+            .cloned()
+            .ok_or(ApiError::NotFound)
+    }
+    pub(crate) fn publish_apps(
+        &self,
+        snapshot: super::apps::AppSnapshot,
+    ) -> Result<AppCatalog, ApiError> {
+        let catalog = snapshot.catalog.clone();
+        self.lock()?.apps = Some(snapshot);
+        Ok(catalog)
+    }
+    pub(crate) fn apps_page(&self, id: ScanId, query: AppQuery) -> Result<AppPage, ApiError> {
+        self.lock()?
+            .apps
+            .as_ref()
+            .filter(|s| s.catalog.id == id)
+            .ok_or(ApiError::NotFound)?
+            .page(query)
+    }
     pub(crate) fn publish_startup(
         &self,
         snapshot: super::startup::StartupSnapshot,

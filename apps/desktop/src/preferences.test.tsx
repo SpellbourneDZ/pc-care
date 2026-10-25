@@ -46,9 +46,13 @@ test('closed routes fall back safely and live shell never starts a mock scan', a
   ).toBeVisible()
   expect(
     api.mock.calls.every(([request]) =>
-      ['get_preferences', 'get_cleanup_rules', 'list_volumes'].includes(
-        request.type,
-      ),
+      [
+        'get_preferences',
+        'get_cleanup_rules',
+        'list_volumes',
+        'refresh_apps',
+        'get_apps_page',
+      ].includes(request.type),
     ),
   ).toBe(true)
 })
