@@ -46,11 +46,21 @@ impl JournalSession {
     }
 
     pub fn read(&self, id: PlanId) -> Result<ExecutionRecord, ApiError> {
+        let record: ExecutionRecord = serde_json::from_slice(&self.read_bytes(&self.path(id))?)
+            .map_err(|_| ApiError::AdapterError)?;
+        record.validate()?;
+        if record.plan_id != id {
+            return Err(ApiError::AdapterError);
+        }
+        Ok(record)
+    }
+
+    fn read_bytes(&self, path: &Path) -> Result<Vec<u8>, ApiError> {
         let file = OpenOptions::new()
             .read(true)
             .share_mode(FILE_SHARE_READ)
             .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
-            .open(self.path(id))
+            .open(path)
             .map_err(|error| {
                 if error.kind() == ErrorKind::NotFound {
                     ApiError::NotFound
@@ -66,13 +76,7 @@ impl JournalSession {
         if data.len() as u64 > MAX_BYTES {
             return Err(ApiError::AdapterError);
         }
-        let record: ExecutionRecord =
-            serde_json::from_slice(&data).map_err(|_| ApiError::AdapterError)?;
-        record.validate()?;
-        if record.plan_id != id {
-            return Err(ApiError::AdapterError);
-        }
-        Ok(record)
+        Ok(data)
     }
 
     pub fn list(&self) -> Result<Vec<ExecutionRecord>, ApiError> {
@@ -139,6 +143,10 @@ impl JournalSession {
     fn write(&self, record: &ExecutionRecord, replace: bool) -> Result<(), ApiError> {
         record.validate()?;
         let data = serde_json::to_vec(record).map_err(|_| ApiError::Internal)?;
+        self.write_bytes(&self.path(record.plan_id), &data, replace)
+    }
+
+    fn write_bytes(&self, destination: &Path, data: &[u8], replace: bool) -> Result<(), ApiError> {
         if data.len() as u64 > MAX_BYTES {
             return Err(ApiError::Capacity);
         }
@@ -150,7 +158,7 @@ impl JournalSession {
             .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
             .open(&temporary)
             .map_err(|_| ApiError::AdapterError)?;
-        file.write_all(&data)
+        file.write_all(data)
             .and_then(|_| file.sync_all())
             .map_err(|_| ApiError::AdapterError)?;
         drop(file);
@@ -166,19 +174,16 @@ impl JournalSession {
             } else {
                 0
             };
-        if unsafe {
-            MoveFileExW(
-                wide(&temporary).as_ptr(),
-                wide(&self.path(record.plan_id)).as_ptr(),
-                flags,
-            )
-        } == 0
+        if unsafe { MoveFileExW(wide(&temporary).as_ptr(), wide(destination).as_ptr(), flags) } == 0
         {
             return Err(ApiError::AdapterError);
         }
         Ok(())
     }
 }
+
+#[path = "execution_recovery.rs"]
+mod recovery;
 
 #[cfg(test)]
 #[path = "execution_journal_tests.rs"]

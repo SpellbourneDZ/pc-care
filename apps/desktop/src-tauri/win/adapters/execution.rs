@@ -28,6 +28,7 @@ pub struct ExecutionSnapshot {
     pub record: ExecutionRecord,
     pub cancel_requested: bool,
     pub journal_error: bool,
+    pub recovery_pending: bool,
 }
 
 impl ExecutionManager {
@@ -41,7 +42,11 @@ impl ExecutionManager {
     pub fn start(
         &self,
         plan: OperationPlan,
-        recycle: impl FnMut(&Candidate, &AtomicBool) -> Result<RecycleReceipt, ExecutionFailure>
+        mut recycle: impl FnMut(
+            &Candidate,
+            &AtomicBool,
+            &JournalSession,
+        ) -> Result<RecycleReceipt, ExecutionFailure>
         + Send
         + 'static,
     ) -> Result<ExecutionSnapshot, ApiError> {
@@ -61,14 +66,19 @@ impl ExecutionManager {
             Ok(mut previous) => {
                 previous.recover();
                 session.replace(&previous)?;
+                session.settle_recovery(plan.id)?;
                 return Ok(ExecutionSnapshot {
                     record: previous,
                     cancel_requested: false,
                     journal_error: false,
+                    recovery_pending: session.recovery_pending(plan.id)?,
                 });
             }
             Err(ApiError::NotFound) => {}
             Err(error) => return Err(error),
+        }
+        if !session.pending_recoveries()?.is_empty() {
+            return Err(ApiError::Capacity);
         }
         session.create(&record)?;
         let cancelled = Arc::new(AtomicBool::new(false));
@@ -76,6 +86,7 @@ impl ExecutionManager {
             record,
             cancel_requested: false,
             journal_error: false,
+            recovery_pending: false,
         };
         *active = Some(Active {
             snapshot: snapshot.clone(),
@@ -86,20 +97,42 @@ impl ExecutionManager {
         let spawned = thread::Builder::new()
             .name("pc-care-execute".into())
             .spawn(move || {
+                let mut journal_failed = false;
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     execution::run(
                         &plan,
                         &cancelled,
                         |record| {
+                            journal_failed = true;
                             session.replace(record)?;
-                            let mut active = shared.lock().map_err(|_| ApiError::Internal)?;
-                            if record.phase == execution::ExecutionPhase::Running {
-                                active.as_mut().ok_or(ApiError::Internal)?.snapshot.record =
-                                    record.clone();
+                            // Keep the durable receipt even if settling its recovery map fails.
+                            {
+                                let mut active = shared.lock().map_err(|_| ApiError::Internal)?;
+                                if record.phase == execution::ExecutionPhase::Running {
+                                    active.as_mut().ok_or(ApiError::Internal)?.snapshot.record =
+                                        record.clone();
+                                }
                             }
+                            session.settle_recovery(plan.id)?;
+                            let pending = session.recovery_pending(plan.id)?;
+                            shared
+                                .lock()
+                                .map_err(|_| ApiError::Internal)?
+                                .as_mut()
+                                .ok_or(ApiError::Internal)?
+                                .snapshot
+                                .recovery_pending = pending;
+                            journal_failed = false;
                             Ok(())
                         },
-                        recycle,
+                        |candidate, cancel| {
+                            let outcome = recycle(candidate, cancel, &session);
+                            if outcome.is_err() && session.recovery_pending(plan.id).unwrap_or(true)
+                            {
+                                return Err(ExecutionFailure::OutcomeUnknown);
+                            }
+                            outcome
+                        },
                     )
                 }))
                 .unwrap_or(Err(ApiError::Internal));
@@ -108,10 +141,17 @@ impl ExecutionManager {
                 {
                     if result.is_err() {
                         active.snapshot.record.recover();
-                        active.snapshot.journal_error =
-                            session.replace(&active.snapshot.record).is_err();
+                        let recovery_failed = session.replace(&active.snapshot.record).is_err();
+                        active.snapshot.journal_error = journal_failed || recovery_failed;
                     } else if let Ok(record) = result {
                         active.snapshot.record = record;
+                    }
+                    match session.recovery_pending(plan.id) {
+                        Ok(pending) => active.snapshot.recovery_pending = pending,
+                        Err(_) => {
+                            active.snapshot.recovery_pending = true;
+                            active.snapshot.journal_error = true;
+                        }
                     }
                     drop(session);
                     active.finished = true;
@@ -143,10 +183,12 @@ impl ExecutionManager {
             record.recover();
             session.replace(&record)?;
         }
+        session.settle_recovery(id)?;
         Ok(ExecutionSnapshot {
             record,
             cancel_requested: false,
             journal_error: false,
+            recovery_pending: session.recovery_pending(id)?,
         })
     }
 

@@ -2,14 +2,14 @@ use super::*;
 use crate::domain::{contracts::*, execution::*};
 use std::fs;
 
-fn fixture() -> PathBuf {
+pub(super) fn fixture() -> PathBuf {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../../target/policy-fixtures")
         .join(Uuid::new_v4().to_string());
     fs::create_dir_all(&root).unwrap();
     root.canonicalize().unwrap()
 }
-fn plan() -> OperationPlan {
+pub(super) fn plan() -> OperationPlan {
     OperationPlan {
         id: PlanId::new(),
         scan_id: ScanId::new(),
@@ -209,7 +209,7 @@ fn process_exit_releases_lease_and_durable_intent_is_never_replayed() {
     assert_eq!(child("intent"), Some(77));
     let manager = super::super::execution::ExecutionManager::new(Some(root));
     let recovered = manager
-        .start(plan, |_, _| panic!("replayed effect after process exit"))
+        .start(plan, |_, _, _| panic!("replayed effect after process exit"))
         .unwrap();
     assert_eq!(recovered.record.phase, ExecutionPhase::Interrupted);
     assert_eq!(

@@ -43,7 +43,7 @@ fn acknowledgement_cancel_and_replay_do_not_repeat_effects() {
     let (entered_tx, entered_rx) = mpsc::channel();
     let (release_tx, release_rx) = mpsc::channel();
     manager
-        .start(plan.clone(), move |_, _| {
+        .start(plan.clone(), move |_, _, _| {
             entered_tx.send(()).unwrap();
             release_rx.recv().unwrap();
             Ok(RecycleReceipt)
@@ -55,13 +55,13 @@ fn acknowledgement_cancel_and_replay_do_not_repeat_effects() {
     assert_eq!(cancelled.record.phase, ExecutionPhase::Running);
     assert!(
         manager
-            .start(plan.clone(), |_, _| panic!("replayed effect"))
+            .start(plan.clone(), |_, _, _| panic!("replayed effect"))
             .is_ok()
     );
     let mut other = plan.clone();
     other.id = PlanId::new();
     assert!(matches!(
-        manager.start(other, |_, _| panic!("concurrent effect")),
+        manager.start(other, |_, _, _| panic!("concurrent effect")),
         Err(ApiError::Capacity)
     ));
     release_tx.send(()).unwrap();
@@ -80,7 +80,7 @@ fn acknowledgement_cancel_and_replay_do_not_repeat_effects() {
     let reopened = ExecutionManager::new(manager.root.clone());
     assert!(
         reopened
-            .start(plan, |_, _| panic!("restart replay"))
+            .start(plan, |_, _, _| panic!("restart replay"))
             .is_ok()
     );
     assert_eq!(
@@ -94,7 +94,7 @@ fn adapter_panic_recovers_unknown_without_keeping_the_worker_slot() {
     let (manager, plan) = fixture();
     let id = plan.id;
     manager
-        .start(plan, |_, _| panic!("artificial adapter panic"))
+        .start(plan, |_, _, _| panic!("artificial adapter panic"))
         .unwrap();
     let deadline = Instant::now() + Duration::from_secs(3);
     loop {

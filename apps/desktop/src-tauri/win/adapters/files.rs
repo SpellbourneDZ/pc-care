@@ -24,6 +24,12 @@ pub struct FileSnapshot {
     metadata: FileMetadata,
 }
 impl FileSnapshot {
+    pub(super) fn id(&self) -> CandidateId {
+        self.id
+    }
+    pub(super) fn source(&self) -> FileSource {
+        self.source
+    }
     pub fn metadata(&self) -> &FileMetadata {
         &self.metadata
     }
@@ -34,8 +40,18 @@ impl FileSnapshot {
 
 /// Pins the checked path without write/delete sharing; not a mutation capability.
 #[must_use = "keep the reservation alive until the checked file is no longer needed"]
-pub(crate) struct FileReservation {
+pub struct FileReservation<'a> {
+    snapshot: &'a FileSnapshot,
+    source_root: LocalPath,
     _handles: Vec<OwnedHandle>,
+}
+impl FileReservation<'_> {
+    pub(super) fn snapshot(&self) -> &FileSnapshot {
+        self.snapshot
+    }
+    pub(super) fn source_root(&self) -> &LocalPath {
+        &self.source_root
+    }
 }
 
 /// Exclusions only restrict the backend scope; they never grant access.
@@ -195,22 +211,25 @@ impl FilePolicy {
     pub fn revalidate(&self, selected: CandidateId, snapshot: &FileSnapshot) -> Result<(), Denial> {
         self.reserve(selected, snapshot).map(drop)
     }
-    pub(crate) fn reserve(
+    pub fn reserve<'a>(
         &self,
         selected: CandidateId,
-        snapshot: &FileSnapshot,
-    ) -> Result<FileReservation, Denial> {
+        snapshot: &'a FileSnapshot,
+    ) -> Result<FileReservation<'a>, Denial> {
         if selected != snapshot.id {
             return Err(Denial::ForeignId);
         }
         self.check_path(snapshot.source, &snapshot.path)?;
-        let current = observe(&snapshot.path, &self.root(snapshot.source)?)?;
+        let source_root = self.root(snapshot.source)?;
+        let current = observe(&snapshot.path, &source_root)?;
         self.check_path(snapshot.source, &current.path)?;
         if snapshot.path != current.path {
             return Err(Denial::TargetChanged);
         }
         check_identity(selected, snapshot.id, &snapshot.metadata, &current.metadata)?;
         Ok(FileReservation {
+            snapshot,
+            source_root,
             _handles: current._handles,
         })
     }
