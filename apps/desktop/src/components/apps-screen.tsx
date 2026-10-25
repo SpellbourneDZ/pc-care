@@ -292,6 +292,37 @@ export function AppsScreen({ controller: c }: { controller: AppsController }) {
             {catalog?.fixture_mode && (
               <p className="notice">{ru.cleanupUx.fixture}</p>
             )}
+            {selected.kind === 'msi' &&
+              selected.system_component === false &&
+              selected.uninstall_block !== 'protected' && (
+                <div className="apps-check">
+                  <Button
+                    variant="outline"
+                    disabled={c.checking}
+                    onClick={() => c.check(selected.id)}
+                  >
+                    {c.checking ? u.checking : u.check}
+                  </Button>
+                  <p className="supporting-text">{u.checkHint}</p>
+                  {c.checkError && (
+                    <p className="notice" role="alert">
+                      {cleanupErrorMessage(c.checkError)}
+                    </p>
+                  )}
+                  {c.checkResult && (
+                    <div className="notice" role="status">
+                      <div>
+                        <p>{u.checkStatuses[c.checkResult.status]}</p>
+                        {c.checkResult.preview && (
+                          <p className="supporting-text">
+                            {u.contexts[c.checkResult.preview.context]}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             <dl className="startup-details">
               <dt>{u.publisher}</dt>
               <dd>

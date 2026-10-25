@@ -117,6 +117,35 @@ async function fixture(
                   },
                 }
               }
+              case 'check_uninstall':
+                return {
+                  status: 'ok',
+                  value: {
+                    type: 'uninstall_check',
+                    data: {
+                      snapshot_id: 'apps',
+                      app_id: r.data.app_id,
+                      status:
+                        mode === 'partial'
+                          ? 'metadata_mismatch'
+                          : 'msi_matched',
+                      execution_enabled: false,
+                      preview:
+                        mode === 'partial'
+                          ? null
+                          : {
+                              product_code:
+                                '{62E06E1F-50AF-4C56-A5C8-2C8E2FBEA775}',
+                              context: 'user_unmanaged',
+                              arguments: [
+                                '/x',
+                                '{62E06E1F-50AF-4C56-A5C8-2C8E2FBEA775}',
+                                '/norestart',
+                              ],
+                            },
+                    },
+                  },
+                }
               default:
                 throw new Error(`Unexpected operation ${r.type}`)
             }
@@ -179,4 +208,29 @@ test('apps fixture: empty, partial, retry and loading are explicit', async ({
   await expect(page.getByRole('row')).toHaveCount(101)
   await fixture(page, 'loading')
   await expect(page.getByText(u.loading, { exact: true })).toBeVisible()
+})
+test('MSI check fixture: matched and mismatched identities never enable uninstall', async ({
+  page,
+}, info) => {
+  for (const mode of ['ready', 'partial'] as const) {
+    await fixture(page, mode)
+    await page
+      .getByRole('row')
+      .filter({ has: page.getByRole('cell', { name: 'MSI', exact: true }) })
+      .first()
+      .getByRole('button')
+      .click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('button', { name: u.check, exact: true }).click()
+    await expect(dialog.getByRole('status')).toContainText(
+      mode === 'ready'
+        ? u.checkStatuses.msi_matched
+        : u.checkStatuses.metadata_mismatch,
+    )
+    await expect(
+      dialog.getByRole('button', { name: u.uninstall, exact: true }),
+    ).toBeDisabled()
+    await page.screenshot({ path: info.outputPath(`apps-msi-${mode}.png`) })
+    await page.keyboard.press('Escape')
+  }
 })

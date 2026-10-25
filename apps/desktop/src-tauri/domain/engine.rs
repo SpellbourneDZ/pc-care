@@ -51,6 +51,22 @@ struct StoredPlan {
 }
 
 impl Engine {
+    pub(crate) fn app(
+        &self,
+        id: ScanId,
+        app_id: &str,
+    ) -> Result<super::apps::InstalledApp, ApiError> {
+        if app_id.len() > 4096 {
+            return Err(ApiError::InvalidRequest);
+        }
+        self.lock()?
+            .apps
+            .as_ref()
+            .filter(|s| s.catalog.id == id)
+            .and_then(|s| s.entries.iter().find(|e| e.id == app_id))
+            .cloned()
+            .ok_or(ApiError::NotFound)
+    }
     pub(crate) fn publish_apps(
         &self,
         snapshot: super::apps::AppSnapshot,

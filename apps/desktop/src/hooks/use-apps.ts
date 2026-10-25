@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import type { AppQuery } from '@/generated/AppQuery'
-import { cleanupRequest } from '@/lib/cleanup-api'
+import { CleanupError, cleanupRequest } from '@/lib/cleanup-api'
 
 export function useApps(enabled: boolean) {
   const [query, setQuery] = useState<AppQuery>({
@@ -30,18 +30,41 @@ export function useApps(enabled: boolean) {
         'apps_page',
       ),
   })
+  const check = useMutation({
+    mutationFn: async (app_id: string) => {
+      const result = await cleanupRequest(
+        { type: 'check_uninstall', data: { snapshot_id: id!, app_id } },
+        'uninstall_check',
+      )
+      if (result.snapshot_id !== id || result.app_id !== app_id)
+        throw new CleanupError('target_changed')
+      return result
+    },
+  })
   return {
     catalog,
     page,
     query,
     selected,
-    setSelected,
+    setSelected: (value: string | null) => {
+      setSelected(value)
+      check.reset()
+    },
+    check: (appId: string) => check.mutate(appId),
+    checking: check.isPending,
+    checkError: check.error,
+    checkResult:
+      check.data?.app_id === selected && check.data.snapshot_id === id
+        ? check.data
+        : undefined,
     setQuery: (value: AppQuery) => {
       setSelected(null)
+      check.reset()
       setQuery(value)
     },
     refresh: () => {
       setSelected(null)
+      check.reset()
       setQuery({ ...query, offset: 0 })
       void catalog.refetch()
     },

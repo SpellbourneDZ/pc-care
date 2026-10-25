@@ -14,3 +14,5 @@ mod registry;
 pub mod startup;
 #[cfg(windows)]
 pub mod storage;
+#[cfg(windows)]
+pub mod uninstall;

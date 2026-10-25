@@ -1082,6 +1082,10 @@
   display: grid;
   gap: 16px;
 }
+.apps-check {
+  display: grid;
+  gap: 8px;
+}
 .apps-filters {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 150px 200px 180px;

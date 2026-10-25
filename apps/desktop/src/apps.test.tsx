@@ -38,9 +38,11 @@ const records: InstalledApp[] = [
     uninstall_block: 'protected',
   },
 ]
+let checkMode: 'match' | 'foreign' | 'error' = 'match'
 beforeEach(() => {
   window.history.replaceState(null, '', '#/apps')
   api.mockReset()
+  checkMode = 'match'
   api.mockImplementation(async (request) => {
     switch (request.type) {
       case 'get_preferences':
@@ -101,10 +103,93 @@ beforeEach(() => {
           },
         }
       }
+      case 'check_uninstall':
+        if (checkMode === 'error')
+          return { status: 'error', error: 'target_changed' }
+        return {
+          status: 'ok',
+          value: {
+            type: 'uninstall_check',
+            data: {
+              snapshot_id: 'apps',
+              app_id:
+                checkMode === 'foreign' ? 'other-app' : request.data.app_id,
+              status: 'msi_matched',
+              execution_enabled: false,
+              preview: {
+                product_code: '{62E06E1F-50AF-4C56-A5C8-2C8E2FBEA775}',
+                context: 'user_unmanaged',
+                arguments: [
+                  '/x',
+                  '{62E06E1F-50AF-4C56-A5C8-2C8E2FBEA775}',
+                  '/norestart',
+                ],
+              },
+            },
+          },
+        }
       default:
         throw new Error(`Unexpected command ${request.type}`)
     }
   })
+})
+
+test('MSI check shows a read-only match and clears it when changing the selected app', async () => {
+  const user = userEvent.setup()
+  render(<App />)
+  await user.click(
+    (
+      await screen.findAllByRole('button', {
+        name: `${u.details}: Одинаковое имя`,
+      })
+    )[0]!,
+  )
+  const dialog = screen.getByRole('dialog')
+  await user.click(within(dialog).getByRole('button', { name: u.check }))
+  expect(await within(dialog).findByRole('status')).toHaveTextContent(
+    u.checkStatuses.msi_matched,
+  )
+  expect(
+    within(dialog).getByRole('button', { name: u.uninstall }),
+  ).toBeDisabled()
+  await user.keyboard('{Escape}')
+  await user.click(
+    screen.getAllByRole('button', { name: `${u.details}: Одинаковое имя` })[1]!,
+  )
+  expect(
+    within(screen.getByRole('dialog')).queryByText(u.checkStatuses.msi_matched),
+  ).not.toBeInTheDocument()
+  expect(
+    within(screen.getByRole('dialog')).queryByRole('button', { name: u.check }),
+  ).not.toBeInTheDocument()
+  expect(
+    api.mock.calls.filter(([r]) => r.type === 'check_uninstall'),
+  ).toHaveLength(1)
+})
+test('MSI check rejects a response for another app and keeps backend errors inside the sheet', async () => {
+  const user = userEvent.setup()
+  checkMode = 'foreign'
+  render(<App />)
+  await user.click(
+    (
+      await screen.findAllByRole('button', {
+        name: `${u.details}: Одинаковое имя`,
+      })
+    )[0]!,
+  )
+  const dialog = screen.getByRole('dialog')
+  await user.click(within(dialog).getByRole('button', { name: u.check }))
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+    ru.cleanupUx.outdated,
+  )
+  expect(
+    within(dialog).queryByText(u.checkStatuses.msi_matched),
+  ).not.toBeInTheDocument()
+  checkMode = 'error'
+  await user.click(within(dialog).getByRole('button', { name: u.check }))
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+    ru.cleanupUx.outdated,
+  )
 })
 test('same-name apps remain distinct; unknown size and disabled actions are explicit; sheet restores focus', async () => {
   const user = userEvent.setup()

@@ -32,6 +32,15 @@ fn dispatch(
     progress: Channel<TaskProgress>,
 ) -> Result<ApiResponse, ApiError> {
     Ok(match request {
+        ApiRequest::CheckUninstall {
+            snapshot_id,
+            app_id,
+        } => {
+            let app = engine.app(snapshot_id, &app_id)?;
+            let result = crate::win::adapters::uninstall::check(snapshot_id, &app);
+            engine.app(snapshot_id, &app_id)?;
+            ApiResponse::UninstallCheck(result)
+        }
         ApiRequest::RefreshApps => {
             ApiResponse::AppsCatalog(engine.publish_apps(crate::win::adapters::apps::collect()?)?)
         }

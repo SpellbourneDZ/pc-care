@@ -46,6 +46,25 @@ test('apps native: isolated compiled registrations use actual IPC and cannot lau
       dialog.getByRole('button', { name: ru.appsUx.leftovers, exact: true }),
     ).toBeDisabled()
     await page.screenshot({ path: info.outputPath('apps-native-details.png') })
+    await page.keyboard.press('Escape')
+    await page
+      .getByRole('row')
+      .filter({ has: page.getByRole('cell', { name: 'MSI', exact: true }) })
+      .getByRole('button')
+      .click()
+    const msi = page.getByRole('dialog')
+    await msi
+      .getByRole('button', { name: ru.appsUx.check, exact: true })
+      .click()
+    await expect(msi.getByRole('status')).toContainText(
+      ru.appsUx.checkStatuses.msi_matched,
+    )
+    await expect(
+      msi.getByRole('button', { name: ru.appsUx.uninstall, exact: true }),
+    ).toBeDisabled()
+    await page.screenshot({
+      path: info.outputPath('apps-native-msi-check.png'),
+    })
     expect(app.errors).toEqual([])
   } finally {
     await app.close()

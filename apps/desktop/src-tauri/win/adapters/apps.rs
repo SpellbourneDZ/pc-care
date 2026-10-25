@@ -30,7 +30,11 @@ pub fn collect() -> Result<AppSnapshot, ApiError> {
         {
             let mut app = blank(
                 source,
-                &format!("fixture-{i}"),
+                &if i == 0 {
+                    "{62E06E1F-50AF-4C56-A5C8-2C8E2FBEA775}".into()
+                } else {
+                    format!("fixture-{i}")
+                },
                 "Искусственная программа".into(),
             );
             app.publisher = Some("Тестовый издатель".into());
@@ -197,6 +201,52 @@ fn read_app(key: HKEY, source: AppSource, name: &str) -> io::Result<Option<Insta
         UninstallBlock::MissingMethod
     };
     Ok(Some(app))
+}
+#[cfg(not(feature = "qa-fixtures"))]
+pub(super) fn revalidate(
+    expected: &InstalledApp,
+) -> Result<(), crate::domain::uninstall::UninstallCheckStatus> {
+    use crate::domain::uninstall::UninstallCheckStatus;
+    if expected.source == AppSource::Msix || expected.registration.contains(['\\', '\0']) {
+        return Err(UninstallCheckStatus::InvalidIdentity);
+    }
+    let hive = if matches!(expected.source, AppSource::Hkcu64 | AppSource::Hkcu32) {
+        HKEY_CURRENT_USER
+    } else {
+        HKEY_LOCAL_MACHINE
+    };
+    let view = if matches!(expected.source, AppSource::Hkcu32 | AppSource::Hklm32) {
+        KEY_WOW64_32KEY
+    } else {
+        KEY_WOW64_64KEY
+    };
+    let keys = registry::open(
+        hive,
+        &format!("{UNINSTALL}\\{}", expected.registration),
+        view,
+        false,
+    )
+    .map_err(|e| {
+        if e.kind() == io::ErrorKind::PermissionDenied {
+            UninstallCheckStatus::AccessDenied
+        } else {
+            UninstallCheckStatus::Unavailable
+        }
+    })?
+    .ok_or(UninstallCheckStatus::TargetChanged)?;
+    let key = keys.last().ok_or(UninstallCheckStatus::TargetChanged)?;
+    let current = read_app(key.0, expected.source, &expected.registration).map_err(|e| {
+        if e.kind() == io::ErrorKind::PermissionDenied {
+            UninstallCheckStatus::AccessDenied
+        } else {
+            UninstallCheckStatus::Unavailable
+        }
+    })?;
+    if current.as_ref() == Some(expected) {
+        Ok(())
+    } else {
+        Err(UninstallCheckStatus::TargetChanged)
+    }
 }
 #[cfg(not(feature = "qa-fixtures"))]
 fn registry_apps(snapshot: &mut AppSnapshot, source: AppSource) {

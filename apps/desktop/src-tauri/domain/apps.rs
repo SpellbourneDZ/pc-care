@@ -54,7 +54,7 @@ pub struct AppIssue {
     pub reason: AppIssueReason,
     pub count: u32,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 pub struct InstalledApp {
     pub id: String,

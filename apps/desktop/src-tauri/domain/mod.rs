@@ -8,3 +8,4 @@ mod mock;
 pub mod policy;
 pub mod startup;
 pub mod storage;
+pub mod uninstall;

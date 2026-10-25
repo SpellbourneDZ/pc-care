@@ -1,6 +1,7 @@
 pub use super::apps::{AppCatalog, AppPage, AppQuery};
 pub use super::startup::{StartupCatalog, StartupPage, StartupQuery};
 pub use super::storage::{StorageNode, StoragePage, StorageQuery, VolumeInfo};
+pub use super::uninstall::UninstallCheck;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use uuid::Uuid;
@@ -270,6 +271,10 @@ pub struct StartScanRequest {
     deny_unknown_fields
 )]
 pub enum ApiRequest {
+    CheckUninstall {
+        snapshot_id: ScanId,
+        app_id: String,
+    },
     RefreshApps,
     GetAppsPage {
         snapshot_id: ScanId,
@@ -333,6 +338,7 @@ pub enum ApiRequest {
     deny_unknown_fields
 )]
 pub enum ApiResponse {
+    UninstallCheck(UninstallCheck),
     AppsCatalog(AppCatalog),
     AppsPage(AppPage),
     StartupCatalog(StartupCatalog),
