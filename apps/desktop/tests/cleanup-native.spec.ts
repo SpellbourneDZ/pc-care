@@ -77,6 +77,9 @@ test('native cleanup: real read-only scan, reviewed cache and exact preview use 
     await expect(dialog).toContainText('искусственный-файл.tmp')
     await expect(dialog).toContainText('artificial-cache')
     await expect(dialog).not.toContainText('Login Data.tmp')
+    await expect(
+      dialog.getByRole('button', { name: ru.cleanupUx.confirm }),
+    ).toBeDisabled()
     await page.screenshot({
       path: info.outputPath('native-cleanup-preview.png'),
     })

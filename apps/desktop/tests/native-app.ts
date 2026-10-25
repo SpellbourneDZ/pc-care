@@ -4,6 +4,37 @@ import { createServer } from 'node:net'
 import { expect } from '@playwright/test'
 import { ru } from '../src/i18n/ru'
 
+export async function waitForPageTarget(
+  endpoint: string,
+  checkProcess: () => void,
+) {
+  await expect
+    .poll(
+      async () => {
+        checkProcess()
+        try {
+          const response = await fetch(`${endpoint}/json/list`, {
+            signal: AbortSignal.timeout(1500),
+          })
+          if (!response.ok) return false
+          const targets: unknown = await response.json()
+          return (
+            Array.isArray(targets) &&
+            targets.some(
+              (target) =>
+                target?.type === 'page' &&
+                typeof target.webSocketDebuggerUrl === 'string',
+            )
+          )
+        } catch {
+          return false
+        }
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+}
+
 export async function startNative(
   playwright: Pick<typeof import('@playwright/test'), 'chromium'>,
   binary: string,
@@ -49,19 +80,12 @@ export async function startNative(
   }
   try {
     const endpoint = `http://127.0.0.1:${port}`
-    await expect
-      .poll(
-        async () => {
-          if (launchError) throw launchError
-          if (app.exitCode !== null)
-            throw new Error(`PC Care exited with ${app.exitCode}`)
-          return fetch(`${endpoint}/json/version`)
-            .then((response) => response.ok)
-            .catch(() => false)
-        },
-        { timeout: 30_000 },
-      )
-      .toBe(true)
+    // A listening CDP browser can still have no WebView2 page to attach to.
+    await waitForPageTarget(endpoint, () => {
+      if (launchError) throw launchError
+      if (app.exitCode !== null)
+        throw new Error(`PC Care exited with ${app.exitCode}`)
+    })
     browser = await playwright.chromium.connectOverCDP(endpoint)
     const context = browser.contexts()[0]
     if (!context) throw new Error('WebView2 context is missing')

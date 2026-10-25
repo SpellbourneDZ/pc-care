@@ -126,6 +126,9 @@ export function CleanupPreview({
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>{ru.cancel}</AlertDialogCancel>
+          <Button variant="outline" disabled>
+            {ru.cleanupUx.confirm}
+          </Button>
           {expired && !stale ? (
             <Button disabled={busy} onClick={onRefresh}>
               {ru.cleanupUx.preview}

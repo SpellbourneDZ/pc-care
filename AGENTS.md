@@ -2,6 +2,10 @@
 
 ## Источник требований и текущая граница
 
+- Актуальный порядок от 25.10.2026: сначала SPE-64 (рабочая read-only сборка от PR #8), затем укрупнённые SPE-65 → SPE-70 → SPE-74 → SPE-80 → SPE-83. Читать также [04 · Codex Handoff](https://linear.app/splbrn/document/04-codex-handoff-optimized-plan-continue-existing-work-903f286bb1be). Он заменяет старую процедуру отдельного PR на каждый микрошаг; один PR на законченный вертикальный блок.
+- SPE-63 сохранена отдельно: `codex/spe-63-cleanup-execution`, HEAD `91b8a54`, Draft PR #9, In Progress. Windows CI зелёный; 72 Rust tests на хосте/VM. Production execute выключен. Не переносить WIP executor в preview, не удалять ветку/историю, не повторять длительные VM-эксперименты до видимой сборки. Вернуться к staging/revalidation/TOCTOU/recovery UI gates после preview; они не блокируют read-only модули.
+- SPE-64: `codex/spe-64-read-only-demo` от проверенного PR #8 `ec7c285`. Из #9 перенесено только исправление готовности CDP и его regression test (`f01ac9f`), без executor. Запуск и карта PR — `docs/SPE-64-preview.md`.
+
 - Linear — источник требований. Перед каждой задачей читать issue, зависимости, PRD, Architecture & Security и Codex Playbook; при недоступности MCP сразу сообщать и не придумывать требования.
 - Проект: https://linear.app/splbrn/project/pc-care-windows-cleaner-open-source-887c4dc0f0c3
 - PRD: https://linear.app/splbrn/document/01-prd-scenarii-ux-i-granicy-mvp-d9240ad80aec
