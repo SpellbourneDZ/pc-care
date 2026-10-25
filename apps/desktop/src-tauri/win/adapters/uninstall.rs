@@ -15,6 +15,7 @@ pub fn check(snapshot_id: ScanId, app: &InstalledApp) -> UninstallCheck {
     } else {
         None
     };
+    let process_privilege = result.as_ref().ok().map(|_| process_privilege());
     UninstallCheck {
         snapshot_id,
         app_id: app.id.clone(),
@@ -24,6 +25,52 @@ pub fn check(snapshot_id: ScanId, app: &InstalledApp) -> UninstallCheck {
         preview: result.ok(),
         execution_enabled: false,
         binary,
+        process_privilege,
+    }
+}
+fn process_privilege() -> ProcessPrivilegeStatus {
+    #[cfg(feature = "qa-fixtures")]
+    {
+        ProcessPrivilegeStatus::Fixture
+    }
+    #[cfg(not(feature = "qa-fixtures"))]
+    {
+        use windows_sys::Win32::{
+            Foundation::CloseHandle,
+            Security::TOKEN_QUERY,
+            System::Threading::{GetCurrentProcess, OpenProcessToken},
+        };
+        let mut token = std::ptr::null_mut();
+        if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) } == 0 {
+            return ProcessPrivilegeStatus::Unavailable;
+        }
+        let status = token_privilege(token);
+        unsafe { CloseHandle(token) };
+        status
+    }
+}
+#[cfg(not(feature = "qa-fixtures"))]
+fn token_privilege(token: windows_sys::Win32::Foundation::HANDLE) -> ProcessPrivilegeStatus {
+    use windows_sys::Win32::Security::{GetTokenInformation, TOKEN_ELEVATION, TokenElevation};
+    let mut elevation = TOKEN_ELEVATION::default();
+    let mut length = 0;
+    let size = std::mem::size_of::<TOKEN_ELEVATION>() as u32;
+    let success = unsafe {
+        GetTokenInformation(
+            token,
+            TokenElevation,
+            (&mut elevation as *mut TOKEN_ELEVATION).cast(),
+            size,
+            &mut length,
+        )
+    };
+    // Process elevation is evidence about PC Care, never authorization to uninstall a product.
+    if success == 0 || length != size {
+        ProcessPrivilegeStatus::Unavailable
+    } else if elevation.TokenIsElevated == 0 {
+        ProcessPrivilegeStatus::NotElevated
+    } else {
+        ProcessPrivilegeStatus::Elevated
     }
 }
 #[cfg(not(feature = "qa-fixtures"))]
@@ -181,6 +228,11 @@ mod tests {
                 result.preview.is_some(),
                 result.status == UninstallCheckStatus::MsiMatched
             );
+            assert_eq!(result.process_privilege.is_some(), result.preview.is_some());
+            assert_ne!(
+                result.process_privilege,
+                Some(ProcessPrivilegeStatus::Fixture)
+            );
             if let Some(preview) = result.preview {
                 assert_eq!(preview.arguments.len(), 3);
                 assert_eq!(preview.arguments[1], product_code(app).unwrap());
@@ -204,6 +256,17 @@ mod tests {
         assert_eq!(
             msi_error(windows_sys::Win32::Foundation::ERROR_ACCESS_DENIED),
             UninstallCheckStatus::AccessDenied
+        );
+    }
+    #[test]
+    fn process_token_is_queried_without_elevation_and_invalid_token_is_unavailable() {
+        assert!(matches!(
+            process_privilege(),
+            ProcessPrivilegeStatus::NotElevated | ProcessPrivilegeStatus::Elevated
+        ));
+        assert_eq!(
+            token_privilege(std::ptr::null_mut()),
+            ProcessPrivilegeStatus::Unavailable
         );
     }
 }

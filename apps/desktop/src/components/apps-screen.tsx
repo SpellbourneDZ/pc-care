@@ -318,6 +318,15 @@ export function AppsScreen({ controller: c }: { controller: AppsController }) {
                             {u.binaryStatuses[c.checkResult.binary]}
                           </p>
                         )}
+                        {c.checkResult.process_privilege && (
+                          <p className="supporting-text">
+                            {
+                              u.processPrivileges[
+                                c.checkResult.process_privilege
+                              ]
+                            }
+                          </p>
+                        )}
                         {c.checkResult.preview && (
                           <p className="supporting-text">
                             {u.contexts[c.checkResult.preview.context]}

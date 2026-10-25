@@ -44,6 +44,12 @@ WinVerifyTrust получает удерживаемый file handle, не за�
 
 В API возвращается отдельный binary status, а не разрешение запуска. В QA — `fixture` с текстом о том, что настоящая подпись не проверяется; trust probe в этой сборке не компилируется. Browser fixtures могут показывать моделируемый положительный/отрицательный статус с явной маркировкой. Handles освобождаются после чтения, результат не устраняет race **будущего** запуска. Проверка прав, удержание/повторная проверка в момент запуска, точное подтверждение и VM evidence остаются обязательными.
 
+## Уровень прав процесса — только сведения
+
+После совпадения MSI `check_uninstall.process_privilege` отдельно сообщает `not_elevated`, `elevated` или `unavailable`. Windows adapter открывает только токен своего процесса с `TOKEN_QUERY`, читает `TokenElevation` через `GetTokenInformation`, проверяет размер ответа и закрывает handle. Токен, группы и privileges не меняются; запуск других процессов и UAC не вызываются. QA возвращает отдельное `fixture`, не читает настоящий токен.
+
+UI показывает это рядом с областью MSI: установка для всех пользователей может потребовать повышения прав, управляемая установка зависит от политики Windows. Неповышенный токен **не доказывает** разрешение на uninstall. Это не ACL/Windows Installer authorization check, не проверка эффективного токена потока и не разрешение на будущий запуск. Любой исход сохраняет `execution_enabled=false`; перед будущим запуском нужны fresh policy/identity/token checks и точное подтверждение выбранной программы.
+
 ## Что не реализовано
 
 **Все действия удаления заблокированы.** `not_validated` означает наличие ещё не проверенного способа, `missing_method` — отсутствие способа в источнике, `protected` — системный/служебный/NoRemove либо неизвестный безопасный статус пакета. IPC команды запуска нет, нажатие не может вызвать процесс или UAC. Это не замена штатного uninstall и не выполненный AC его запуска.
@@ -57,6 +63,8 @@ WinVerifyTrust получает удерживаемый file handle, не за�
 Локальный integration test builder прошёл: созданы и повторно прочитаны два MSI, проверены hashes и отсутствие регистрации продуктов на хосте. Тест добавлен в Windows CI. Runtime после `3509ad5` не менялся; полный hosted CI этого этапа [40186120921](https://github.com/SpellbourneDZ/pc-care/actions/runs/40186120921) прошёл.
 
 ## Проверка и запуск
+
+Этап process token: прошли 75 Rust tests (включая реальное чтение собственного токена и отказ для недействительного handle), 36 frontend tests, 65 browser tests, production/QA build и 2 production + 5 QA native tests. Typecheck/lint/format, fmt/clippy и all-features clippy прошли; Rust→TS bindings сверены полным Rust test run. Frontend проверяет неповышенный, повышенный и неизвестный статус: ни один не включает удаление. Native QA проверяет отдельную маркировку fixture; browser fixtures — явно моделируемые сведения. Production screenshot личного списка не создавался. Это не elevated-user/ACL/MSI uninstall VM matrix.
 
 На Windows 11 x64 прошли typecheck/lint/format/bindings, 31 frontend test и 66 Rust tests, fmt/clippy (включая all-features). Пройдены 50 существующих browser-сценариев и 10 новых во всех пяти проектах; новые сценарии повторно прошли после исправления выбора fixture mode через URL. В полном первом прогоне 5 тестов состояний не прошли из-за неопределённого порядка накопленных init scripts; исправление проверено всеми 10 Apps-сценариями. Hosted CI запускается отдельно после создания PR.
 
@@ -88,8 +96,12 @@ Production/QA build и 2 production + 5 QA native tests прошли. После
 
 ![Отказ при неподтверждённой подписи — browser fixture](evidence/spe-74/08-signature-untrusted.png)
 
+![Уровень прав отдельно от допуска к удалению — native QA fixture](evidence/spe-74/09-native-process-privilege.png)
+
 API references: [Uninstall Registry metadata](https://learn.microsoft.com/en-us/windows/win32/msi/uninstall-registry-key), [PackageManager.FindPackagesForUser](https://learn.microsoft.com/en-us/uwp/api/windows.management.deployment.packagemanager.findpackagesforuser?view=winrt-26100).
 
 MSI references: [MsiGetProductInfoExW](https://learn.microsoft.com/en-us/windows/win32/api/msi/nf-msi-msigetproductinfoexw), [msiexec options](https://learn.microsoft.com/windows-server/administration/windows-commands/msiexec).
 
 Signature references: [WinVerifyTrust](https://learn.microsoft.com/en-us/windows/win32/api/Wintrust/nf-wintrust-winverifytrust), [offline trust flags](https://learn.microsoft.com/en-us/windows/win32/api/wintrust/ns-wintrust-wintrust_data), [catalog member verification](https://learn.microsoft.com/en-us/windows/win32/api/Wintrust/ns-wintrust-wintrust_catalog_info), [catalog enumeration sample](https://github.com/microsoft/Windows-classic-samples/blob/main/Samples/Security/CodeSigning/cpp/codesigning.cpp).
+
+Process token references: [OpenProcessToken](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocesstoken), [GetTokenInformation](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-gettokeninformation), [TOKEN_ELEVATION](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-token_elevation).

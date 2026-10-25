@@ -4,6 +4,7 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import { App } from './app'
 import { operationApi } from './lib/operation-api'
 import type { InstalledApp } from './generated/InstalledApp'
+import type { ProcessPrivilegeStatus } from './generated/ProcessPrivilegeStatus'
 import { ru } from './i18n/ru'
 vi.mock('./lib/operation-api', () => ({ operationApi: vi.fn() }))
 const api = vi.mocked(operationApi),
@@ -39,10 +40,12 @@ const records: InstalledApp[] = [
   },
 ]
 let checkMode: 'match' | 'foreign' | 'error' = 'match'
+let processPrivilege: ProcessPrivilegeStatus = 'fixture'
 beforeEach(() => {
   window.history.replaceState(null, '', '#/apps')
   api.mockReset()
   checkMode = 'match'
+  processPrivilege = 'fixture'
   api.mockImplementation(async (request) => {
     switch (request.type) {
       case 'get_preferences':
@@ -117,6 +120,7 @@ beforeEach(() => {
               status: 'msi_matched',
               execution_enabled: false,
               binary: 'fixture',
+              process_privilege: processPrivilege,
               preview: {
                 product_code: '{62E06E1F-50AF-4C56-A5C8-2C8E2FBEA775}',
                 context: 'user_unmanaged',
@@ -135,6 +139,36 @@ beforeEach(() => {
   })
 })
 
+test.each(['not_elevated', 'elevated', 'unavailable'] as const)(
+  'process privilege %s is evidence only and never enables uninstall',
+  async (privilege) => {
+    processPrivilege = privilege
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(
+      (
+        await screen.findAllByRole('button', {
+          name: `${u.details}: Одинаковое имя`,
+        })
+      )[0]!,
+    )
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: u.check }))
+    expect(await within(dialog).findByRole('status')).toHaveTextContent(
+      u.processPrivileges[privilege],
+    )
+    expect(within(dialog).getByRole('status')).toHaveTextContent(
+      u.contexts.user_unmanaged,
+    )
+    expect(
+      within(dialog).getByRole('button', { name: u.uninstall }),
+    ).toBeDisabled()
+    expect(
+      api.mock.calls.some(([request]) => request.type === 'execute_plan'),
+    ).toBe(false)
+  },
+)
+
 test('MSI check shows a read-only match and clears it when changing the selected app', async () => {
   const user = userEvent.setup()
   render(<App />)
@@ -152,6 +186,9 @@ test('MSI check shows a read-only match and clears it when changing the selected
   )
   expect(within(dialog).getByRole('status')).toHaveTextContent(
     u.binaryStatuses.fixture,
+  )
+  expect(within(dialog).getByRole('status')).toHaveTextContent(
+    u.processPrivileges.fixture,
   )
   expect(
     within(dialog).getByRole('button', { name: u.uninstall }),

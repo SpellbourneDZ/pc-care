@@ -131,6 +131,8 @@ async function fixture(
                           ? 'metadata_mismatch'
                           : 'msi_matched',
                       execution_enabled: false,
+                      process_privilege:
+                        mode === 'partial' ? null : 'not_elevated',
                       binary:
                         mode === 'partial'
                           ? null
@@ -234,12 +236,16 @@ test('MSI check fixture: matched and mismatched identities never enable uninstal
         ? u.checkStatuses.metadata_mismatch
         : u.checkStatuses.msi_matched,
     )
-    if (mode !== 'partial')
+    if (mode !== 'partial') {
       await expect(dialog.getByRole('status')).toContainText(
         mode === 'ready'
           ? u.binaryStatuses.microsoft_signature_offline
           : u.binaryStatuses.untrusted_signature,
       )
+      await expect(dialog.getByRole('status')).toContainText(
+        u.processPrivileges.not_elevated,
+      )
+    }
     await expect(
       dialog.getByRole('button', { name: u.uninstall, exact: true }),
     ).toBeDisabled()

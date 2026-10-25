@@ -34,6 +34,14 @@ pub enum InstallerBinaryStatus {
     Unavailable,
     Fixture,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum ProcessPrivilegeStatus {
+    NotElevated,
+    Elevated,
+    Unavailable,
+    Fixture,
+}
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 pub struct MsiUninstallPreview {
@@ -50,6 +58,7 @@ pub struct UninstallCheck {
     pub preview: Option<MsiUninstallPreview>,
     pub execution_enabled: bool,
     pub binary: Option<InstallerBinaryStatus>,
+    pub process_privilege: Option<ProcessPrivilegeStatus>,
 }
 pub struct MsiProduct {
     pub context: MsiContext,
