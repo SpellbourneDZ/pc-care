@@ -46,3 +46,11 @@ GUI-обработчик выбирает ровно один из двух ре
 - `vm-probe-runner.exe`: отчёт `%TEMP%\PCcare-VM-recycle-probe.json`
 
 Не считать код 0 у экспериментального probe доказательством безопасности executor: нужно проверить каждый HRESULT, callbacks, сохранение file identity и sentinels. Нет полного native cleanup flow, пока это прямо не подтверждено в [результатах SPE-63](SPE-63-execution.md). Текущая Evaluation показывает истёкшую лицензию; активация и полная матрица Windows 10/11 не подтверждены.
+
+## Набор unit64 v6
+
+В последнем прогоне ISO содержит только `pc-care-tests.exe`, `vm-test-runner.exe`, generated types и manifest; COM probe в него не входит. 64 Rust tests прошли за 28.14 s, без failed/ignored. SHA-256 test EXE и хэши Rust-исходников относятся к сборке `f01ac9f`; GUI runner переиспользован из v5 с тем же SHA-256. Значения manifest с ISO сохранены без изменений; JSON в репозитории отформатирован Prettier.
+
+Использован новый overlay от той же проверенной дисковой базы, TCG single thread, NIC отключён, ISO read-only, без host shares/физических дисков. GUI runner запущен явно из Проводника; после кода 0 диалог закрыт, VM остановлена штатным ACPI powerdown. Отчёт извлечён только после завершения QEMU. При первом 45-секундном ожидании выключение ещё продолжалось; повторное ожидание завершилось нормально, принудительная остановка не использовалась.
+
+[Отчёт unit64](evidence/spe-63/windows10-unit-64.txt) и [manifest v6](evidence/spe-63/payload-unit64-v6.manifest.json) дополняют прежние COM-наблюдения, но не заменяют проверку полного executor.
