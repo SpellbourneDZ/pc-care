@@ -2142,6 +2142,7 @@ dependencies = [
  "tauri-build",
  "ts-rs",
  "uuid",
+ "windows",
  "windows-sys 0.61.2",
 ]
 

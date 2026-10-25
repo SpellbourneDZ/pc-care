@@ -32,6 +32,12 @@ fn dispatch(
     progress: Channel<TaskProgress>,
 ) -> Result<ApiResponse, ApiError> {
     Ok(match request {
+        ApiRequest::RefreshApps => {
+            ApiResponse::AppsCatalog(engine.publish_apps(crate::win::adapters::apps::collect()?)?)
+        }
+        ApiRequest::GetAppsPage { snapshot_id, query } => {
+            ApiResponse::AppsPage(engine.apps_page(snapshot_id, query)?)
+        }
         ApiRequest::RefreshStartup => ApiResponse::StartupCatalog(engine.publish_startup(
             crate::win::adapters::startup::collect(&settings.load()?.preferences.exclusions)?,
         )?),

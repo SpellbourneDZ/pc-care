@@ -1,3 +1,4 @@
+pub use super::apps::{AppCatalog, AppPage, AppQuery};
 pub use super::startup::{StartupCatalog, StartupPage, StartupQuery};
 pub use super::storage::{StorageNode, StoragePage, StorageQuery, VolumeInfo};
 use serde::{Deserialize, Serialize};
@@ -269,6 +270,11 @@ pub struct StartScanRequest {
     deny_unknown_fields
 )]
 pub enum ApiRequest {
+    RefreshApps,
+    GetAppsPage {
+        snapshot_id: ScanId,
+        query: AppQuery,
+    },
     RefreshStartup,
     GetStartupPage {
         snapshot_id: ScanId,
@@ -327,6 +333,8 @@ pub enum ApiRequest {
     deny_unknown_fields
 )]
 pub enum ApiResponse {
+    AppsCatalog(AppCatalog),
+    AppsPage(AppPage),
     StartupCatalog(StartupCatalog),
     StartupPage(StartupPage),
     Volumes(Vec<VolumeInfo>),
